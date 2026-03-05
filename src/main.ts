@@ -2,6 +2,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibregl from 'maplibre-gl';
 import SimulationWorker from './simulationWorker?worker&inline';
 import './styles.css';
+import legalMarkdown from '../docs/LEGAL.md?raw';
 import manualMarkdown from '../docs/Manual.md?raw';
 import { DEFAULT_WORKSPACE } from './defaults';
 import { exportPinsKml, exportReportsCsv, exportWorkspaceJson, parsePinsKml, parseWorkspaceJson } from './io';
@@ -28,7 +29,8 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'simulation', label: 'Simulation' },
   { id: 'reports', label: 'Reports' },
   { id: 'preferences', label: 'Preferences' },
-  { id: 'help', label: 'Help' }
+  { id: 'help', label: 'Help' },
+  { id: 'legal', label: 'Legal' }
 ];
 
 const propagationParameterDefaults: Record<PropagationModelType, Record<string, number>> = {
@@ -153,6 +155,8 @@ function renderTabContent(tabId: TabId): string {
       return renderPreferencesTab();
     case 'help':
       return renderHelpTab();
+    case 'legal':
+      return renderLegalTab();
     default:
       return '<h2>RF Ranger</h2>';
   }
@@ -339,6 +343,20 @@ function renderHelpTab(): string {
         ${manual.tocHtml}
       </div>
       <div class="manual__body">${manual.bodyHtml}</div>
+    </section>
+  `;
+}
+
+function renderLegalTab(): string {
+  const legal = renderManualWithToc(legalMarkdown);
+  return `
+    <h2>Legal</h2>
+    <section class="panel manual">
+      <div class="manual__toc">
+        <h3>Contents</h3>
+        ${legal.tocHtml}
+      </div>
+      <div class="manual__body">${legal.bodyHtml}</div>
     </section>
   `;
 }

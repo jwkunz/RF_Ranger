@@ -7,7 +7,8 @@ export type TabId =
   | 'propagation'
   | 'reports'
   | 'preferences'
-  | 'help';
+  | 'help'
+  | 'legal';
 
 export type PowerUnit = 'dBm' | 'dBW';
 export type DistanceUnit = 'km' | 'm' | 'miles' | 'feet';

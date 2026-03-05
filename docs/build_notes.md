@@ -172,3 +172,17 @@
 - Known Issues / Next Focus:
   - Add dedicated Legal tab and legal content rendering.
 - Commit: this commit (`milestone(M13): welcome/map label cleanup v0.14.0`)
+
+## M14 - Dedicated Legal Tab and Legal Disclosures
+- Date: 2026-03-05
+- Version: 0.15.0
+- Completed:
+  - Added `Legal` tab after `Help` in the top navigation.
+  - Wired Legal tab content to load directly from `docs/LEGAL.md`.
+  - Expanded `docs/LEGAL.md` to include MIT license text.
+  - Added dependency/license inventory generated from installed package manifests.
+  - Added remote communication disclosures (OSM tiles, Nominatim geocoding).
+  - Added explicit telemetry/data-collection statement.
+- Known Issues / Next Focus:
+  - Optional: add automated script to regenerate dependency license list for each release.
+- Commit: this commit (`milestone(M14): legal tab and disclosures v0.15.0`)
