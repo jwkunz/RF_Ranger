@@ -186,3 +186,15 @@
 - Known Issues / Next Focus:
   - Optional: add automated script to regenerate dependency license list for each release.
 - Commit: this commit (`milestone(M14): legal tab and disclosures v0.15.0`)
+
+## M15 - Radios Form Labeling + kHz Bandwidth Input
+- Date: 2026-03-05
+- Version: 0.16.0
+- Completed:
+  - Added explicit field labels with units on Radios source/sink entry forms.
+  - Changed source and sink bandwidth inputs from Hz to kHz in the UI.
+  - Added conversion from kHz input to stored/calculated Hz internally.
+  - Updated radios tables to display bandwidth in kHz for readability.
+- Known Issues / Next Focus:
+  - Optional: add inline validation ranges/tooltips for each radios parameter.
+- Commit: this commit (`milestone(M15): radios labels and khz bandwidth v0.16.0`)

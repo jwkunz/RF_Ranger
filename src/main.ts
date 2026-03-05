@@ -369,7 +369,7 @@ function renderRadiosTab(): string {
         <td>${escapeHtml(source.name)}</td>
         <td>${source.txPowerDbm}</td>
         <td>${source.carrierFrequencyMHz}</td>
-        <td>${source.bandwidthHz}</td>
+        <td>${(source.bandwidthHz / 1000).toFixed(3)}</td>
         <td>${source.noiseFigureDb}</td>
         <td><button data-edit-source="${source.id}">Edit</button> <button data-delete-source="${source.id}">Delete</button></td>
       </tr>`
@@ -382,7 +382,7 @@ function renderRadiosTab(): string {
       <tr>
         <td>${escapeHtml(sink.name)}</td>
         <td>${sink.carrierFrequencyMHz}</td>
-        <td>${sink.bandwidthHz}</td>
+        <td>${(sink.bandwidthHz / 1000).toFixed(3)}</td>
         <td>${sink.environmentNoiseTemperatureK}</td>
         <td>${sink.noiseFigureDb}</td>
         <td>${sink.requiredSnrDb}</td>
@@ -396,37 +396,37 @@ function renderRadiosTab(): string {
     <section class="panel">
       <h3>Add Source</h3>
       <form id="add-source-form" class="grid-form">
-        <input name="name" placeholder="Name" required />
-        <input name="txPowerDbm" type="number" step="0.1" placeholder="TX Power (dBm)" required />
-        <input name="carrierFrequencyMHz" type="number" step="0.001" placeholder="Carrier Frequency (MHz)" required />
-        <input name="bandwidthHz" type="number" step="1" placeholder="Bandwidth (Hz)" required />
-        <input name="noiseFigureDb" type="number" step="0.1" placeholder="Noise Figure (dB)" required />
+        <label>Name<input name="name" placeholder="e.g. Base TX" required /></label>
+        <label>TX Power (dBm)<input name="txPowerDbm" type="number" step="0.1" required /></label>
+        <label>Carrier Frequency (MHz)<input name="carrierFrequencyMHz" type="number" step="0.001" required /></label>
+        <label>Bandwidth (kHz)<input name="bandwidthKHz" type="number" step="0.001" required /></label>
+        <label>Noise Figure (dB)<input name="noiseFigureDb" type="number" step="0.1" required /></label>
         <button class="primary-btn" type="submit">Add Source</button>
       </form>
     </section>
     <section class="panel">
       <h3>Sources</h3>
       <table>
-        <thead><tr><th>Name</th><th>TX Power</th><th>Freq (MHz)</th><th>BW (Hz)</th><th>NF (dB)</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>TX Power (dBm)</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>NF (dB)</th><th>Actions</th></tr></thead>
         <tbody>${sourceRows || '<tr><td colspan="6">No sources yet.</td></tr>'}</tbody>
       </table>
     </section>
     <section class="panel">
       <h3>Add Sink</h3>
       <form id="add-sink-form" class="grid-form">
-        <input name="name" placeholder="Name" required />
-        <input name="carrierFrequencyMHz" type="number" step="0.001" placeholder="Carrier Frequency (MHz)" required />
-        <input name="bandwidthHz" type="number" step="1" placeholder="Bandwidth (Hz)" required />
-        <input name="environmentNoiseTemperatureK" type="number" step="1" value="300" placeholder="Environment Noise Temp (K)" required />
-        <input name="noiseFigureDb" type="number" step="0.1" value="10" placeholder="Noise Figure (dB)" required />
-        <input name="requiredSnrDb" type="number" step="0.1" value="15" placeholder="Required SNR (dB)" required />
+        <label>Name<input name="name" placeholder="e.g. Remote RX 1" required /></label>
+        <label>Carrier Frequency (MHz)<input name="carrierFrequencyMHz" type="number" step="0.001" required /></label>
+        <label>Bandwidth (kHz)<input name="bandwidthKHz" type="number" step="0.001" required /></label>
+        <label>Environment Noise Temperature (K)<input name="environmentNoiseTemperatureK" type="number" step="1" value="300" required /></label>
+        <label>Noise Figure (dB)<input name="noiseFigureDb" type="number" step="0.1" value="10" required /></label>
+        <label>Required SNR (dB)<input name="requiredSnrDb" type="number" step="0.1" value="15" required /></label>
         <button class="primary-btn" type="submit">Add Sink</button>
       </form>
     </section>
     <section class="panel">
       <h3>Sinks</h3>
       <table>
-        <thead><tr><th>Name</th><th>Freq (MHz)</th><th>BW (Hz)</th><th>Env Temp (K)</th><th>NF (dB)</th><th>Req SNR (dB)</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>Env Temp (K)</th><th>NF (dB)</th><th>Req SNR (dB)</th><th>Actions</th></tr></thead>
         <tbody>${sinkRows || '<tr><td colspan="7">No sinks yet.</td></tr>'}</tbody>
       </table>
     </section>
@@ -947,7 +947,7 @@ function wireRadiosEvents(): void {
       name: String(data.get('name') ?? ''),
       txPowerDbm: toNumber(data.get('txPowerDbm')),
       carrierFrequencyMHz: toNumber(data.get('carrierFrequencyMHz')),
-      bandwidthHz: toNumber(data.get('bandwidthHz')),
+      bandwidthHz: toNumber(data.get('bandwidthKHz')) * 1000,
       noiseFigureDb: toNumber(data.get('noiseFigureDb'))
     };
     workspace.sources.push(source);
@@ -964,7 +964,7 @@ function wireRadiosEvents(): void {
       id: uid(),
       name: String(data.get('name') ?? ''),
       carrierFrequencyMHz: toNumber(data.get('carrierFrequencyMHz')),
-      bandwidthHz: toNumber(data.get('bandwidthHz')),
+      bandwidthHz: toNumber(data.get('bandwidthKHz')) * 1000,
       environmentNoiseTemperatureK: toNumber(data.get('environmentNoiseTemperatureK') ?? '300') || 300,
       noiseFigureDb: toNumber(data.get('noiseFigureDb') ?? '10') || 10,
       requiredSnrDb: toNumber(data.get('requiredSnrDb') ?? '15') || 15
