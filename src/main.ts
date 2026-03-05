@@ -315,12 +315,13 @@ function renderReportsTab(): string {
       return `<tr${highlighted}>
         <td>${escapeHtml(row.sourceName)}</td>
         <td>${escapeHtml(row.sinkName)}</td>
-        <td>${formatPower(row.transmitterEirpDbm)}</td>
+        <td>${formatPowerDensity(row.transmitterEirpDensityDbmPerHz)}</td>
         <td>${formatDistance(row.distanceKm)}</td>
         <td>${row.propagationLossesDb.toFixed(2)} dB</td>
-        <td>${formatPower(row.incidentRfPowerDbm)}</td>
+        <td>${formatPowerDensity(row.incidentRfPowerDensityDbmPerHz)}</td>
         <td>${row.incidentElectricFieldVm.toExponential(3)} V/m</td>
-        <td>${formatPower(row.availablePowerAtAntennaDbm)}</td>
+        <td>${formatPowerDensity(row.availablePowerDensityAtAntennaDbmPerHz)}</td>
+        <td>${formatPowerDensity(row.receiverNoiseFloorDensityDbmPerHz)}</td>
         <td>${row.snrDb.toFixed(2)} dB</td>
         <td>${row.usableLink}</td>
         <td>${escapeHtml(row.warnings.join('; '))}</td>
@@ -340,19 +341,20 @@ function renderReportsTab(): string {
           <tr>
             <th>Source</th>
             <th>Sink</th>
-            <th>Transmitter EIRP</th>
+            <th>Transmitter EIRP Density</th>
             <th>Distance</th>
             <th>Propagation Losses</th>
-            <th>Incident RF Power</th>
+            <th>Incident RF Power Density</th>
             <th>Incident Electric Field</th>
-            <th>Available Power at Antenna</th>
+            <th>Available Power Density at Antenna</th>
+            <th>Receiver Noise Floor</th>
             <th>SNR in Receiver</th>
             <th>Useable Link</th>
             <th>Warnings</th>
             <th>Jump</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="11">No report data. Run Calculate in Map View.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="12">No report data. Run Calculate in Map View.</td></tr>'}</tbody>
       </table>
     </section>
   `;
@@ -1346,11 +1348,11 @@ function applyTheme(): void {
   document.documentElement.dataset.theme = workspace.preferences.theme;
 }
 
-function formatPower(dbm: number): string {
+function formatPowerDensity(dbmPerHz: number): string {
   if (workspace.preferences.powerUnit === 'dBW') {
-    return `${(dbm - 30).toFixed(2)} dBW`;
+    return `${(dbmPerHz - 30).toFixed(2)} dBW/Hz`;
   }
-  return `${dbm.toFixed(2)} dBm`;
+  return `${dbmPerHz.toFixed(2)} dBm/Hz`;
 }
 
 function formatDistance(km: number): string {

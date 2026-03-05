@@ -266,3 +266,16 @@
 - Known Issues / Next Focus:
   - Optional: expose computed `T_recv` and total noise temperature in Reports for transparency.
 - Commit: this commit (`milestone(M20): source pin sim + noise temp model v0.21.0`)
+
+## M21 - Spectral Density Simulation and Noise Floor Density Reporting
+- Date: 2026-03-05
+- Version: 0.22.0
+- Completed:
+  - Converted simulation power-domain calculations to spectral density domain (`dBm/Hz`).
+  - Updated report values to density equivalents for transmitter EIRP, incident RF, and available power at antenna.
+  - Added `Receiver Noise Floor` column after available power at antenna (reported as density).
+  - Kept SNR computation as dB difference between received power density and noise floor density.
+  - Updated CSV export schema/headers to match density-based report fields.
+- Known Issues / Next Focus:
+  - Optional: add explicit units in table headers (e.g. `dBm/Hz`) for every density field.
+- Commit: this commit (`milestone(M21): spectral-density simulation/report v0.22.0`)

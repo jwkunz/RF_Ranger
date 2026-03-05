@@ -84,12 +84,13 @@ export interface SimulationResultRow {
   sinkPinId: string;
   sourceName: string;
   sinkName: string;
-  transmitterEirpDbm: number;
+  transmitterEirpDensityDbmPerHz: number;
   distanceKm: number;
   propagationLossesDb: number;
-  incidentRfPowerDbm: number;
+  incidentRfPowerDensityDbmPerHz: number;
   incidentElectricFieldVm: number;
-  availablePowerAtAntennaDbm: number;
+  availablePowerDensityAtAntennaDbmPerHz: number;
+  receiverNoiseFloorDensityDbmPerHz: number;
   snrDb: number;
   usableLink: 'Y' | 'N';
   warnings: string[];

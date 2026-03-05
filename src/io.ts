@@ -81,12 +81,13 @@ export function exportReportsCsv(rows: SimulationResultRow[]): void {
   const header = [
     'Source Name',
     'Sink Name',
-    'Transmitter EIRP',
+    'Transmitter EIRP Density',
     'Distance',
     'Propagation Losses',
-    'Incident RF Power',
+    'Incident RF Power Density',
     'Incident Electric Field',
-    'Available Power at Antenna',
+    'Available Power Density at Antenna',
+    'Receiver Noise Floor',
     'SNR in Receiver',
     'Useable Link'
   ];
@@ -94,12 +95,13 @@ export function exportReportsCsv(rows: SimulationResultRow[]): void {
     [
       row.sourceName,
       row.sinkName,
-      row.transmitterEirpDbm.toString(),
+      row.transmitterEirpDensityDbmPerHz.toString(),
       row.distanceKm.toString(),
       row.propagationLossesDb.toString(),
-      row.incidentRfPowerDbm.toString(),
+      row.incidentRfPowerDensityDbmPerHz.toString(),
       row.incidentElectricFieldVm.toString(),
-      row.availablePowerAtAntennaDbm.toString(),
+      row.availablePowerDensityAtAntennaDbmPerHz.toString(),
+      row.receiverNoiseFloorDensityDbmPerHz.toString(),
       row.snrDb.toString(),
       row.usableLink
     ]

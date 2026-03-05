@@ -45,20 +45,20 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
       const baseFsplDb = 20 * Math.log10(Math.max(distanceKm, 0.001)) + 20 * Math.log10(Math.max(frequencyMHz, 0.001)) + 32.44;
       const extraLossDb = modelLossAdjustmentDb(input.propagationModel, distanceKm, frequencyMHz);
       const totalPathLossDb = baseFsplDb + extraLossDb;
-      const transmitterEirpDbm = input.source.txPowerDbm + txGain;
+      const txPowerDensityDbmPerHz = input.source.txPowerDbm - 10 * Math.log10(Math.max(input.source.bandwidthHz, 1));
+      const transmitterEirpDensityDbmPerHz = txPowerDensityDbmPerHz + txGain;
 
-      const incidentRfPowerDbm = transmitterEirpDbm - totalPathLossDb;
-      const availablePowerAtAntennaDbm = incidentRfPowerDbm + rxGain;
+      const incidentRfPowerDensityDbmPerHz = transmitterEirpDensityDbmPerHz - totalPathLossDb;
+      const availablePowerDensityAtAntennaDbmPerHz = incidentRfPowerDensityDbmPerHz + rxGain;
 
-      const noiseFloorDbm = thermalNoiseDbm(
+      const receiverNoiseFloorDensityDbmPerHz = thermalNoiseDensityDbmPerHz(
         sinkDef.sink.environmentNoiseTemperatureK ?? 300,
-        sinkDef.sink.bandwidthHz,
         sinkDef.sink.noiseFigureDb ?? 10
       );
-      const snrDb = availablePowerAtAntennaDbm - noiseFloorDbm;
-      const thresholdDbm = noiseFloorDbm + (sinkDef.sink.requiredSnrDb ?? 15);
+      const snrDb = availablePowerDensityAtAntennaDbmPerHz - receiverNoiseFloorDensityDbmPerHz;
+      const thresholdDbmPerHz = receiverNoiseFloorDensityDbmPerHz + (sinkDef.sink.requiredSnrDb ?? 15);
 
-      const usable = availablePowerAtAntennaDbm >= thresholdDbm ? 'Y' : 'N';
+      const usable = availablePowerDensityAtAntennaDbmPerHz >= thresholdDbmPerHz ? 'Y' : 'N';
 
       const warnings: string[] = [];
       if (Math.abs(sinkDef.sink.carrierFrequencyMHz - input.source.carrierFrequencyMHz) > 0.001) {
@@ -74,12 +74,13 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
         sinkPinId: sinkDef.pin.id,
         sourceName: input.sourceLabel,
         sinkName: sinkDef.pin.name,
-        transmitterEirpDbm,
+        transmitterEirpDensityDbmPerHz,
         distanceKm,
         propagationLossesDb: totalPathLossDb,
-        incidentRfPowerDbm,
+        incidentRfPowerDensityDbmPerHz,
         incidentElectricFieldVm,
-        availablePowerAtAntennaDbm,
+        availablePowerDensityAtAntennaDbmPerHz,
+        receiverNoiseFloorDensityDbmPerHz,
         snrDb,
         usableLink: usable,
         warnings
@@ -153,12 +154,12 @@ function dbmToWatts(dbm: number): number {
   return Math.pow(10, (dbm - 30) / 10);
 }
 
-function thermalNoiseDbm(temperatureK: number, bandwidthHz: number, noiseFigureDb: number): number {
+function thermalNoiseDensityDbmPerHz(temperatureK: number, noiseFigureDb: number): number {
   const t0 = 290;
   const noiseFactor = Math.pow(10, noiseFigureDb / 10);
   const receiverEquivalentTempK = t0 * Math.max(noiseFactor - 1, 0);
   const boltzmann = 1.380649e-23;
-  const noiseWatts = boltzmann * Math.max(temperatureK + receiverEquivalentTempK, 1) * Math.max(bandwidthHz, 1);
+  const noiseWatts = boltzmann * Math.max(temperatureK + receiverEquivalentTempK, 1);
   return 10 * Math.log10(noiseWatts * 1000);
 }
 
