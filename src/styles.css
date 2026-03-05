@@ -234,3 +234,28 @@ fieldset.param-grid {
     min-height: 50vh;
   }
 }
+
+.progress-wrap {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+progress {
+  width: 100%;
+  height: 1rem;
+}
+
+.focus-row {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.manual h1,
+.manual h2,
+.manual h3 {
+  margin-top: 1rem;
+}
+
+.manual ul {
+  margin: 0.3rem 0 0.8rem 1.1rem;
+}

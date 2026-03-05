@@ -1,4 +1,4 @@
-import type { MapPin, WorkspaceSnapshot } from './types';
+import type { MapPin, SimulationResultRow, WorkspaceSnapshot } from './types';
 
 export function exportWorkspaceJson(workspace: WorkspaceSnapshot): void {
   const json = JSON.stringify(workspace, null, 2);
@@ -72,6 +72,47 @@ export async function parsePinsKml(file: File): Promise<MapPin[]> {
       sinkAntennaId
     };
   });
+}
+
+export function exportReportsCsv(rows: SimulationResultRow[]): void {
+  const header = [
+    'Sink Name',
+    'Distance',
+    'Incident RF Power',
+    'Incident Electric Field',
+    'Available Power at Antenna',
+    'Signal to Noise Ratio In Radio',
+    'Useable Link'
+  ];
+  const lines = rows.map((row) =>
+    [
+      row.sinkName,
+      row.distanceKm.toString(),
+      row.incidentRfPowerDbm.toString(),
+      row.incidentElectricFieldVm.toString(),
+      row.availablePowerAtAntennaDbm.toString(),
+      row.snrDb.toString(),
+      row.usableLink
+    ]
+      .map((value) => csvEscape(value))
+      .join(',')
+  );
+
+  const csv = [header.join(','), ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'rf-ranger-reports.csv';
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value: string): string {
+  if (!value.includes(',') && !value.includes('"') && !value.includes('\n')) {
+    return value;
+  }
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 function findExtendedDataValue(placemark: Element, key: string): string | undefined {

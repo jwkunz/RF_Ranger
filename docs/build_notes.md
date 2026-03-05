@@ -58,3 +58,16 @@
 - Known Issues / Next Focus:
   - Add simulation engine, progress, and reports integration.
 - Commit: this commit (`milestone(M4): map pin kml geocoding v0.5.0`)
+
+## M5 - Simulation Engine + Progress + Reports
+- Date: 2026-03-05
+- Version: 0.6.0
+- Completed:
+  - Added worker-based simulation engine with per-sink progress updates.
+  - Implemented analytic calculations and reporting pipeline for all sink pins.
+  - Added Useable Link decision logic using sensitivity + SNR threshold.
+  - Added latest-run Reports table with map jump links.
+  - Added CSV export for report data.
+- Known Issues / Next Focus:
+  - Improve manual rendering, UX polish, and finalize preferences/help behavior.
+- Commit: this commit (`milestone(M5): simulation reports v0.6.0`)

@@ -2,8 +2,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibregl from 'maplibre-gl';
 import './styles.css';
 import legalMarkdown from '../docs/LEGAL.md?raw';
+import manualMarkdown from '../docs/Manual.md?raw';
 import { DEFAULT_WORKSPACE } from './defaults';
-import { exportPinsKml, exportWorkspaceJson, parsePinsKml, parseWorkspaceJson } from './io';
+import { exportPinsKml, exportReportsCsv, exportWorkspaceJson, parsePinsKml, parseWorkspaceJson } from './io';
 import { loadWorkspace, saveWorkspace } from './storage';
 import type {
   AntennaModel,
@@ -13,6 +14,7 @@ import type {
   PropagationModelType,
   RadioSink,
   RadioSource,
+  SimulationResultRow,
   TabId,
   WorkspaceSnapshot
 } from './types';
@@ -38,6 +40,42 @@ const propagationParameterDefaults: Record<PropagationModelType, Record<string, 
   Troposcatter: { constantA: 120 }
 };
 
+interface ProgressState {
+  running: boolean;
+  completed: number;
+  total: number;
+  message: string;
+}
+
+interface SimulationWorkerInput {
+  source: RadioSource;
+  txAntenna: AntennaModel;
+  fallbackRxAntenna: AntennaModel;
+  propagationModel: PropagationModel;
+  sinks: Array<{ pin: WorkspaceSnapshot['pins'][number]; sink: RadioSink; sinkAntenna: AntennaModel | null }>;
+  txLatitude: number;
+  txLongitude: number;
+  snrThresholdDb: number;
+}
+
+interface SimulationProgressMessage {
+  type: 'progress';
+  completed: number;
+  total: number;
+}
+
+interface SimulationCompleteMessage {
+  type: 'complete';
+  rows: SimulationResultRow[];
+}
+
+interface SimulationErrorMessage {
+  type: 'error';
+  message: string;
+}
+
+type SimulationWorkerMessage = SimulationProgressMessage | SimulationCompleteMessage | SimulationErrorMessage;
+
 let selectedTab: TabId = 'map';
 let splashDismissed = false;
 let workspace: WorkspaceSnapshot = structuredClone(DEFAULT_WORKSPACE);
@@ -48,6 +86,10 @@ let selectedSourceId = '';
 let selectedTxAntennaId = '';
 let selectedPropagationModelId = '';
 let selectedRxAntennaId = '';
+let txLatitude = 39.8283;
+let txLongitude = -98.5795;
+let progress: ProgressState = { running: false, completed: 0, total: 0, message: 'Idle' };
+let focusedReportPinId = '';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) {
@@ -123,11 +165,11 @@ function renderTabContent(tabId: TabId): string {
     case 'propagation':
       return renderPropagationTab();
     case 'reports':
-      return '<h2>Reports</h2><p>Reports are generated from map simulations.</p>';
+      return renderReportsTab();
     case 'preferences':
       return renderPreferencesTab();
     case 'help':
-      return '<h2>Help</h2><p>Manual rendering will be added in a later milestone.</p>';
+      return renderHelpTab();
     default:
       return '<h2>RF Ranger</h2>';
   }
@@ -152,21 +194,28 @@ function renderMapTab(): string {
     .map((pin) => {
       const sink = workspace.sinks.find((entry) => entry.id === pin.sinkRadioId);
       const antenna = workspace.antennas.find((entry) => entry.id === pin.sinkAntennaId);
+      const reportLink = workspace.reportLatest.some((row) => row.sinkPinId === pin.id)
+        ? `<button data-jump-report="${pin.id}" title="Jump to report">🔗</button>`
+        : '';
       return `<tr>
         <td>${escapeHtml(pin.name)}</td>
         <td>${pin.latitude.toFixed(6)}, ${pin.longitude.toFixed(6)}</td>
         <td>${escapeHtml(sink?.name ?? 'unknown')}</td>
         <td>${escapeHtml(antenna?.name ?? 'unknown')}</td>
-        <td><button data-delete-pin="${pin.id}">Delete</button></td>
+        <td>${reportLink} <button data-delete-pin="${pin.id}">Delete</button></td>
       </tr>`;
     })
     .join('');
+
+  const percent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
 
   return `
     <h2>Map View</h2>
     <div class="map-layout">
       <aside class="panel stack map-controls">
         <h3>Simulation Inputs</h3>
+        <label>TX Latitude<input id="tx-lat" type="number" step="0.000001" value="${txLatitude}" /></label>
+        <label>TX Longitude<input id="tx-lon" type="number" step="0.000001" value="${txLongitude}" /></label>
         <label>TX Power Model (Source)
           <select id="map-source-select">${sourceOptions || '<option value="">No source available</option>'}</select>
         </label>
@@ -179,7 +228,12 @@ function renderMapTab(): string {
         <label>RX Antenna Gain Model
           <select id="map-rx-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
         </label>
-        <button id="map-calc" class="primary-btn">Calculate</button>
+        <button id="map-calc" class="primary-btn" ${progress.running ? 'disabled' : ''}>Calculate</button>
+        <div class="progress-wrap">
+          <div>Progress: ${progress.message}</div>
+          <progress value="${progress.completed}" max="${Math.max(progress.total, 1)}"></progress>
+          <div>${percent}%</div>
+        </div>
         <h3>Add Sink Pin</h3>
         <label>Pin Name<input id="pin-name" placeholder="Sink name" /></label>
         <label>Bind Sink Radio
@@ -212,6 +266,57 @@ function renderMapTab(): string {
       </table>
       <p class="muted">Tip: Click on the map to set coordinate fields, then add pin with required sink bindings.</p>
     </section>
+  `;
+}
+
+function renderReportsTab(): string {
+  const rows = workspace.reportLatest
+    .map((row) => {
+      const highlighted = row.sinkPinId === focusedReportPinId ? ' class="focus-row"' : '';
+      return `<tr${highlighted}>
+        <td>${escapeHtml(row.sinkName)}</td>
+        <td>${formatDistance(row.distanceKm)}</td>
+        <td>${formatPower(row.incidentRfPowerDbm)}</td>
+        <td>${row.incidentElectricFieldVm.toExponential(3)} V/m</td>
+        <td>${formatPower(row.availablePowerAtAntennaDbm)}</td>
+        <td>${row.snrDb.toFixed(2)} dB</td>
+        <td>${row.usableLink}</td>
+        <td>${escapeHtml(row.warnings.join('; '))}</td>
+        <td><button data-jump-pin="${row.sinkPinId}">Map</button></td>
+      </tr>`;
+    })
+    .join('');
+
+  return `
+    <h2>Reports</h2>
+    <section class="panel">
+      <div class="action-row">
+        <button id="export-csv">Export CSV</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Sink</th>
+            <th>Distance</th>
+            <th>Incident RF Power</th>
+            <th>Incident Electric Field</th>
+            <th>Available Power at Antenna</th>
+            <th>SNR</th>
+            <th>Useable Link</th>
+            <th>Warnings</th>
+            <th>Jump</th>
+          </tr>
+        </thead>
+        <tbody>${rows || '<tr><td colspan="9">No report data. Run Calculate in Map View.</td></tr>'}</tbody>
+      </table>
+    </section>
+  `;
+}
+
+function renderHelpTab(): string {
+  return `
+    <h2>Help</h2>
+    <section class="panel manual">${renderMarkdownSimple(manualMarkdown)}</section>
   `;
 }
 
@@ -440,6 +545,9 @@ function wireTabEvents(): void {
   if (selectedTab === 'map') {
     wireMapEvents();
   }
+  if (selectedTab === 'reports') {
+    wireReportsEvents();
+  }
 }
 
 function wireMapEvents(): void {
@@ -510,11 +618,122 @@ function wireMapEvents(): void {
     });
   });
 
-  document.querySelector<HTMLButtonElement>('#map-calc')?.addEventListener('click', () => {
-    alert('Simulation engine is implemented in milestone M5.');
+  document.querySelectorAll<HTMLButtonElement>('[data-jump-report]').forEach((button) => {
+    button.addEventListener('click', () => {
+      focusedReportPinId = button.dataset.jumpReport ?? '';
+      selectedTab = 'reports';
+      render();
+    });
+  });
+
+  document.querySelector<HTMLButtonElement>('#map-calc')?.addEventListener('click', async () => {
+    await runSimulation();
+  });
+
+  const txLatInput = document.querySelector<HTMLInputElement>('#tx-lat');
+  const txLonInput = document.querySelector<HTMLInputElement>('#tx-lon');
+  txLatInput?.addEventListener('change', () => {
+    txLatitude = Number.parseFloat(txLatInput.value);
+  });
+  txLonInput?.addEventListener('change', () => {
+    txLongitude = Number.parseFloat(txLonInput.value);
   });
 
   initMap();
+}
+
+function wireReportsEvents(): void {
+  document.querySelector<HTMLButtonElement>('#export-csv')?.addEventListener('click', () => {
+    exportReportsCsv(workspace.reportLatest);
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-jump-pin]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const pinId = button.dataset.jumpPin ?? '';
+      const pin = workspace.pins.find((entry) => entry.id === pinId);
+      selectedTab = 'map';
+      render();
+      if (pin && map) {
+        map.flyTo({ center: [pin.longitude, pin.latitude], zoom: 13 });
+      }
+    });
+  });
+}
+
+async function runSimulation(): Promise<void> {
+  const source = workspace.sources.find((entry) => entry.id === selectedSourceId);
+  const txAntenna = workspace.antennas.find((entry) => entry.id === selectedTxAntennaId);
+  const propagationModel = workspace.propagationModels.find((entry) => entry.id === selectedPropagationModelId);
+  const fallbackRxAntenna = workspace.antennas.find((entry) => entry.id === selectedRxAntennaId);
+
+  if (!source || !txAntenna || !propagationModel || !fallbackRxAntenna) {
+    alert('Select source, TX antenna, propagation model, and RX antenna before calculation.');
+    return;
+  }
+
+  const sinks = workspace.pins
+    .map((pin) => {
+      const sink = workspace.sinks.find((entry) => entry.id === pin.sinkRadioId);
+      if (!sink) {
+        return null;
+      }
+      const sinkAntenna = workspace.antennas.find((entry) => entry.id === pin.sinkAntennaId) ?? null;
+      return { pin, sink, sinkAntenna };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  if (!sinks.length) {
+    alert('Add sink pins bound to valid sink radios before calculation.');
+    return;
+  }
+
+  progress = { running: true, completed: 0, total: sinks.length, message: 'Starting' };
+  render();
+
+  const worker = new Worker(new URL('./simulationWorker.ts', import.meta.url), { type: 'module' });
+
+  const input: SimulationWorkerInput = {
+    source,
+    txAntenna,
+    fallbackRxAntenna,
+    propagationModel,
+    sinks,
+    txLatitude,
+    txLongitude,
+    snrThresholdDb: workspace.preferences.snrThresholdDb
+  };
+
+  worker.onmessage = async (event: MessageEvent<SimulationWorkerMessage>) => {
+    if (event.data.type === 'progress') {
+      progress = {
+        running: true,
+        completed: event.data.completed,
+        total: event.data.total,
+        message: `Processed ${event.data.completed}/${event.data.total}`
+      };
+      render();
+      return;
+    }
+
+    if (event.data.type === 'complete') {
+      workspace.reportLatest = event.data.rows;
+      await saveWorkspace(workspace);
+      progress = { running: false, completed: event.data.rows.length, total: event.data.rows.length, message: 'Complete' };
+      worker.terminate();
+      selectedTab = 'reports';
+      render();
+      return;
+    }
+
+    if (event.data.type === 'error') {
+      progress = { running: false, completed: 0, total: 0, message: 'Error' };
+      worker.terminate();
+      alert(`Simulation failed: ${event.data.message}`);
+      render();
+    }
+  };
+
+  worker.postMessage(input);
 }
 
 async function addPinFromForm(): Promise<void> {
@@ -572,8 +791,8 @@ function initMap(): void {
         },
         layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
       },
-      center: [-98.5795, 39.8283],
-      zoom: 3
+      center: [txLongitude, txLatitude],
+      zoom: 4
     });
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -599,6 +818,12 @@ function initMap(): void {
     marker.addTo(map as maplibregl.Map);
     return marker;
   });
+
+  const txMarker = new maplibregl.Marker({ color: '#16a34a' })
+    .setLngLat([txLongitude, txLatitude])
+    .setPopup(new maplibregl.Popup().setHTML('<strong>TX Source</strong>'));
+  txMarker.addTo(map as maplibregl.Map);
+  mapMarkers.push(txMarker);
 }
 
 async function geocodeAddress(query: string): Promise<{ lat: number; lon: number } | null> {
@@ -888,6 +1113,38 @@ function wirePreferencesEvents(): void {
 
 function applyTheme(): void {
   document.documentElement.dataset.theme = workspace.preferences.theme;
+}
+
+function formatPower(dbm: number): string {
+  if (workspace.preferences.powerUnit === 'dBW') {
+    return `${(dbm - 30).toFixed(2)} dBW`;
+  }
+  return `${dbm.toFixed(2)} dBm`;
+}
+
+function formatDistance(km: number): string {
+  switch (workspace.preferences.distanceUnit) {
+    case 'm':
+      return `${(km * 1000).toFixed(2)} m`;
+    case 'miles':
+      return `${(km * 0.621371).toFixed(3)} miles`;
+    case 'feet':
+      return `${(km * 3280.84).toFixed(2)} ft`;
+    case 'km':
+    default:
+      return `${km.toFixed(3)} km`;
+  }
+}
+
+function renderMarkdownSimple(markdown: string): string {
+  return escapeHtml(markdown)
+    .replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
+    .replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
+    .replace(/^#\s+(.+)$/gm, '<h1>$1</h1>')
+    .replace(/^\-\s+(.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/\n\n/g, '<br/><br/>')
+    .replace(/\n/g, '<br/>');
 }
 
 function toNumber(value: FormDataEntryValue | null): number {
