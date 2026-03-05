@@ -27,8 +27,9 @@ export function exportPinsKml(pins: MapPin[]): void {
     <Placemark>
       <name>${escapeXml(pin.name)}</name>
       <ExtendedData>
-        <Data name="sinkRadioId"><value>${escapeXml(pin.sinkRadioId)}</value></Data>
-        <Data name="sinkAntennaId"><value>${escapeXml(pin.sinkAntennaId)}</value></Data>
+        <Data name="pinType"><value>${escapeXml(pin.kind)}</value></Data>
+        <Data name="radioId"><value>${escapeXml(pin.radioId)}</value></Data>
+        <Data name="antennaId"><value>${escapeXml(pin.antennaId)}</value></Data>
       </ExtendedData>
       <Point><coordinates>${pin.longitude},${pin.latitude},0</coordinates></Point>
     </Placemark>`
@@ -60,16 +61,18 @@ export async function parsePinsKml(file: File): Promise<MapPin[]> {
     const name = placemark.getElementsByTagName('name')[0]?.textContent?.trim() || `Imported Sink ${index + 1}`;
     const coordsRaw = placemark.getElementsByTagName('coordinates')[0]?.textContent?.trim() || '';
     const [lonRaw, latRaw] = coordsRaw.split(',');
-    const sinkRadioId = findExtendedDataValue(placemark, 'sinkRadioId') || '';
-    const sinkAntennaId = findExtendedDataValue(placemark, 'sinkAntennaId') || '';
+    const pinType = findExtendedDataValue(placemark, 'pinType') || 'sink';
+    const radioId = findExtendedDataValue(placemark, 'radioId') || findExtendedDataValue(placemark, 'sinkRadioId') || '';
+    const antennaId = findExtendedDataValue(placemark, 'antennaId') || findExtendedDataValue(placemark, 'sinkAntennaId') || '';
 
     return {
       id: crypto.randomUUID(),
       name,
       latitude: Number.parseFloat(latRaw),
       longitude: Number.parseFloat(lonRaw),
-      sinkRadioId,
-      sinkAntennaId
+      kind: pinType === 'source' ? 'source' : 'sink',
+      radioId,
+      antennaId
     };
   });
 }

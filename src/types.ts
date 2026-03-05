@@ -75,8 +75,9 @@ export interface MapPin {
   name: string;
   latitude: number;
   longitude: number;
-  sinkRadioId: string;
-  sinkAntennaId: string;
+  kind: 'source' | 'sink';
+  radioId: string;
+  antennaId: string;
 }
 
 export interface SimulationResultRow {

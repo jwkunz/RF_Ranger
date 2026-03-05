@@ -224,3 +224,18 @@
 - Known Issues / Next Focus:
   - Optional: persist resizer width preference in local workspace settings.
 - Commit: this commit (`milestone(M17): map source/resizer/viewport fix v0.18.0`)
+
+## M18 - Add Pins Pane Refactor (Source/Sink Tabs)
+- Date: 2026-03-05
+- Version: 0.19.0
+- Completed:
+  - Refactored Add Pins pane into two internal tabs: `Add RX Sink` and `Add TX Source`.
+  - Unified pane field labels to `Radio` and `Antenna` and made behavior tab-driven.
+  - Updated map pin model to typed pins (`source`/`sink`) with shared radio/antenna references.
+  - Updated KML import/export to include pin type and new radio/antenna keys, with legacy sink-key compatibility.
+  - Updated Defined Pins table to list all pins and show each pin type (Source/Sink).
+  - Updated marker colors: source pins are red, sink pins are blue.
+  - Improved map/pane resizing coupling so Add Pins pane width expands proportionally with map width drag.
+- Known Issues / Next Focus:
+  - Optional: persist pane sub-tab and pane widths in workspace preferences.
+- Commit: this commit (`milestone(M18): add-pins pane source/sink refactor v0.19.0`)

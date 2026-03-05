@@ -78,7 +78,7 @@ interface SimulationErrorMessage {
 }
 
 type SimulationWorkerMessage = SimulationProgressMessage | SimulationCompleteMessage | SimulationErrorMessage;
-type ClickBindMode = 'sink' | 'source';
+type PinPaneTab = 'sink' | 'source';
 
 let selectedTab: TabId = 'welcome';
 let workspace: WorkspaceSnapshot = structuredClone(DEFAULT_WORKSPACE);
@@ -94,7 +94,8 @@ let txLongitude = -98.5795;
 let mapCenter: [number, number] | null = null;
 let mapZoom = 4;
 let mapPaneWidthPx: number | null = null;
-let clickBindMode: ClickBindMode = 'sink';
+let pinPaneTab: PinPaneTab = 'sink';
+let pinPaneWidthPx: number | null = null;
 let progress: ProgressState = { running: false, completed: 0, total: 0, message: 'Idle' };
 let focusedReportPinId = '';
 
@@ -179,22 +180,29 @@ function renderMapTab(): string {
   const sourceOptions = workspace.sources
     .map((source) => `<option value="${source.id}" ${source.id === selectedSourceId ? 'selected' : ''}>${escapeHtml(source.name)}</option>`)
     .join('');
-  const antennaOptions = workspace.antennas
+  const txAntennaOptions = workspace.antennas
     .map((antenna) => `<option value="${antenna.id}" ${antenna.id === selectedTxAntennaId ? 'selected' : ''}>${escapeHtml(antenna.name)}</option>`)
     .join('');
   const sinkOptions = workspace.sinks.map((sink) => `<option value="${sink.id}">${escapeHtml(sink.name)}</option>`).join('');
+  const rxAntennaOptions = workspace.antennas
+    .map((antenna) => `<option value="${antenna.id}" ${antenna.id === selectedRxAntennaId ? 'selected' : ''}>${escapeHtml(antenna.name)}</option>`)
+    .join('');
 
   const pinRows = workspace.pins
     .map((pin) => {
-      const sink = workspace.sinks.find((entry) => entry.id === pin.sinkRadioId);
-      const antenna = workspace.antennas.find((entry) => entry.id === pin.sinkAntennaId);
-      const reportLink = workspace.reportLatest.some((row) => row.sinkPinId === pin.id)
+      const radioName =
+        pin.kind === 'source'
+          ? workspace.sources.find((entry) => entry.id === pin.radioId)?.name
+          : workspace.sinks.find((entry) => entry.id === pin.radioId)?.name;
+      const antenna = workspace.antennas.find((entry) => entry.id === pin.antennaId);
+      const reportLink = pin.kind === 'sink' && workspace.reportLatest.some((row) => row.sinkPinId === pin.id)
         ? `<button data-jump-report="${pin.id}" title="Jump to report">🔗</button>`
         : '';
       return `<tr>
         <td>${escapeHtml(pin.name)}</td>
+        <td>${pin.kind === 'source' ? 'Source' : 'Sink'}</td>
         <td>${pin.latitude.toFixed(6)}, ${pin.longitude.toFixed(6)}</td>
-        <td>${escapeHtml(sink?.name ?? 'unknown')}</td>
+        <td>${escapeHtml(radioName ?? 'unknown')}</td>
         <td>${escapeHtml(antenna?.name ?? 'unknown')}</td>
         <td>${reportLink} <button data-delete-pin="${pin.id}">Delete</button></td>
       </tr>`;
@@ -210,44 +218,32 @@ function renderMapTab(): string {
       <div id="map-resizer" class="map-resizer" role="separator" aria-orientation="vertical" aria-label="Resize map panel"></div>
       <aside class="panel stack map-controls map-controls--right">
         <h3>Add Pins</h3>
-        <fieldset class="click-mode">
-          <legend>Map Click Mode</legend>
-          <label class="inline-radio">
-            <input type="radio" name="click-bind-mode" value="sink" ${clickBindMode === 'sink' ? 'checked' : ''} />
-            Add RX Sink
-          </label>
-          <label class="inline-radio">
-            <input type="radio" name="click-bind-mode" value="source" ${clickBindMode === 'source' ? 'checked' : ''} />
-            Set TX Source
-          </label>
-        </fieldset>
-        <label>Pin Name<input id="pin-name" placeholder="Sink name" /></label>
-        ${
-          clickBindMode === 'source'
-            ? `
-        <label>Bind TX Source Radio
-          <select id="pin-source-select">${sourceOptions || '<option value="">No source radio available</option>'}</select>
+        <div class="pane-tabs">
+          <button class="pane-tab ${pinPaneTab === 'sink' ? 'pane-tab--active' : ''}" data-pin-pane-tab="sink">Add RX Sink</button>
+          <button class="pane-tab ${pinPaneTab === 'source' ? 'pane-tab--active' : ''}" data-pin-pane-tab="source">Add TX Source</button>
+        </div>
+        <label>Name<input id="pin-name" placeholder="${pinPaneTab === 'source' ? 'Source name' : 'Sink name'}" /></label>
+        <label>Radio
+          <select id="pin-radio-select">${
+            pinPaneTab === 'source'
+              ? sourceOptions || '<option value="">No source radio available</option>'
+              : sinkOptions || '<option value="">No sink radio available</option>'
+          }</select>
         </label>
-        <label>Bind TX Antenna
-          <select id="pin-source-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
+        <label>Antenna
+          <select id="pin-antenna-select">${
+            pinPaneTab === 'source'
+              ? txAntennaOptions || '<option value="">No antenna available</option>'
+              : rxAntennaOptions || '<option value="">No antenna available</option>'
+          }</select>
         </label>
-        `
-            : `
-        <label>Bind RX Sink Radio
-          <select id="pin-sink-select">${sinkOptions || '<option value="">No sink radio available</option>'}</select>
-        </label>
-        <label>Bind RX Sink Antenna
-          <select id="pin-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
-        </label>
-        `
-        }
         <label>Latitude<input id="pin-lat" type="number" step="0.000001" /></label>
         <label>Longitude<input id="pin-lon" type="number" step="0.000001" /></label>
-        <button id="add-pin-coord">${clickBindMode === 'source' ? 'Set TX Source (Coordinates)' : 'Add Pin (Coordinates)'}</button>
+        <button id="add-pin-coord">${pinPaneTab === 'source' ? 'Add TX Source (Coordinates)' : 'Add RX Sink (Coordinates)'}</button>
         <label>Address Search
           <input id="geocode-input" placeholder="Address" />
         </label>
-        <button id="add-pin-address">${clickBindMode === 'source' ? 'Geocode + Set TX Source' : 'Geocode + Add Pin'}</button>
+        <button id="add-pin-address">${pinPaneTab === 'source' ? 'Geocode + Add TX Source' : 'Geocode + Add RX Sink'}</button>
         <div class="action-row">
           <button id="export-kml">Export KML</button>
           <label class="import-label">Import KML<input id="import-kml" type="file" accept=".kml,application/vnd.google-earth.kml+xml" /></label>
@@ -257,10 +253,10 @@ function renderMapTab(): string {
     <section class="panel">
       <h3>Defined Pins</h3>
       <table>
-        <thead><tr><th>Name</th><th>Coordinates</th><th>Sink Radio</th><th>Sink Antenna</th><th>Actions</th></tr></thead>
-        <tbody>${pinRows || '<tr><td colspan="5">No sink pins yet.</td></tr>'}</tbody>
+        <thead><tr><th>Name</th><th>Type</th><th>Coordinates</th><th>Radio</th><th>Antenna</th><th>Actions</th></tr></thead>
+        <tbody>${pinRows || '<tr><td colspan="6">No pins yet.</td></tr>'}</tbody>
       </table>
-      <p class="muted">Tip: Click on the map to set coordinate fields, then add pin with required sink bindings.</p>
+      <p class="muted">Tip: Select Add RX Sink or Add TX Source, then click the map or use address/coordinates to add the selected pin type.</p>
     </section>
   `;
 }
@@ -614,24 +610,25 @@ function wireMapEvents(): void {
   if (layout && mapPaneWidthPx) {
     layout.style.setProperty('--map-pane-width', `${mapPaneWidthPx}px`);
   }
+  if (layout && pinPaneWidthPx) {
+    layout.style.setProperty('--pin-pane-width', `${pinPaneWidthPx}px`);
+  }
 
-  document.querySelectorAll<HTMLInputElement>('input[name="click-bind-mode"]').forEach((input) => {
-    input.addEventListener('change', () => {
-      if (input.checked) {
-        clickBindMode = input.value as ClickBindMode;
+  document.querySelectorAll<HTMLButtonElement>('[data-pin-pane-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const next = button.dataset.pinPaneTab as PinPaneTab;
+      if (next !== pinPaneTab) {
+        pinPaneTab = next;
         render();
       }
     });
   });
 
-  const sourceBindSelect = document.querySelector<HTMLSelectElement>('#pin-source-select');
-  sourceBindSelect?.addEventListener('change', () => {
-    selectedSourceId = sourceBindSelect.value;
-  });
-
-  const sourceAntennaBindSelect = document.querySelector<HTMLSelectElement>('#pin-source-antenna-select');
-  sourceAntennaBindSelect?.addEventListener('change', () => {
-    selectedTxAntennaId = sourceAntennaBindSelect.value;
+  const radioSelect = document.querySelector<HTMLSelectElement>('#pin-radio-select');
+  radioSelect?.addEventListener('change', () => {
+    if (pinPaneTab === 'source') {
+      selectedSourceId = radioSelect.value;
+    }
   });
 
   const resizer = document.querySelector<HTMLDivElement>('#map-resizer');
@@ -674,7 +671,7 @@ function wireMapEvents(): void {
       return;
     }
     const pins = await parsePinsKml(file);
-    const valid = pins.filter((pin) => pin.sinkRadioId && pin.sinkAntennaId);
+    const valid = pins.filter((pin) => pin.radioId && pin.antennaId);
     workspace.pins.push(...valid);
     await saveWorkspace(workspace);
     captureMapViewport();
@@ -765,11 +762,14 @@ async function runSimulation(): Promise<void> {
 
   const sinks = workspace.pins
     .map((pin) => {
-      const sink = workspace.sinks.find((entry) => entry.id === pin.sinkRadioId);
+      if (pin.kind !== 'sink') {
+        return null;
+      }
+      const sink = workspace.sinks.find((entry) => entry.id === pin.radioId);
       if (!sink) {
         return null;
       }
-      const sinkAntenna = workspace.antennas.find((entry) => entry.id === pin.sinkAntennaId) ?? null;
+      const sinkAntenna = workspace.antennas.find((entry) => entry.id === pin.antennaId) ?? null;
       return { pin, sink, sinkAntenna };
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
@@ -828,47 +828,16 @@ async function runSimulation(): Promise<void> {
 }
 
 async function addPinFromForm(): Promise<void> {
-  if (clickBindMode === 'source') {
-    const latInput = document.querySelector<HTMLInputElement>('#pin-lat');
-    const lonInput = document.querySelector<HTMLInputElement>('#pin-lon');
-    const sourceSelect = document.querySelector<HTMLSelectElement>('#pin-source-select');
-    const antennaSelect = document.querySelector<HTMLSelectElement>('#pin-source-antenna-select');
-
-    const lat = Number.parseFloat(latInput?.value ?? '');
-    const lon = Number.parseFloat(lonInput?.value ?? '');
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      alert('Provide valid latitude and longitude.');
-      return;
-    }
-
-    if (!sourceSelect?.value) {
-      alert('Select a TX source radio.');
-      return;
-    }
-    if (!antennaSelect?.value) {
-      alert('Select a TX antenna.');
-      return;
-    }
-
-    selectedSourceId = sourceSelect.value;
-    selectedTxAntennaId = antennaSelect.value;
-    txLatitude = lat;
-    txLongitude = lon;
-    captureMapViewport();
-    render();
-    return;
-  }
-
   const nameInput = document.querySelector<HTMLInputElement>('#pin-name');
-  const sinkSelect = document.querySelector<HTMLSelectElement>('#pin-sink-select');
+  const radioSelect = document.querySelector<HTMLSelectElement>('#pin-radio-select');
   const antennaSelect = document.querySelector<HTMLSelectElement>('#pin-antenna-select');
   const latInput = document.querySelector<HTMLInputElement>('#pin-lat');
   const lonInput = document.querySelector<HTMLInputElement>('#pin-lon');
 
-  const sinkRadioId = sinkSelect?.value || '';
-  const sinkAntennaId = antennaSelect?.value || '';
-  if (!sinkRadioId || !sinkAntennaId) {
-    alert('Pin requires bound sink radio and sink antenna.');
+  const radioId = radioSelect?.value || '';
+  const antennaId = antennaSelect?.value || '';
+  if (!radioId || !antennaId) {
+    alert('Pin requires bound radio and antenna.');
     return;
   }
 
@@ -881,12 +850,22 @@ async function addPinFromForm(): Promise<void> {
 
   workspace.pins.push({
     id: uid(),
-    name: nameInput?.value.trim() || `Sink ${workspace.pins.length + 1}`,
+    name: nameInput?.value.trim() || `${pinPaneTab === 'source' ? 'Source' : 'Sink'} ${workspace.pins.length + 1}`,
     latitude: lat,
     longitude: lon,
-    sinkRadioId,
-    sinkAntennaId
+    kind: pinPaneTab,
+    radioId,
+    antennaId
   });
+
+  if (pinPaneTab === 'source') {
+    selectedSourceId = radioId;
+    selectedTxAntennaId = antennaId;
+    txLatitude = lat;
+    txLongitude = lon;
+  } else {
+    selectedRxAntennaId = antennaId;
+  }
 
   await saveWorkspace(workspace);
   captureMapViewport();
@@ -895,24 +874,34 @@ async function addPinFromForm(): Promise<void> {
 
 async function addPinFromClick(lat: number, lon: number): Promise<void> {
   const nameInput = document.querySelector<HTMLInputElement>('#pin-name');
-  const sinkSelect = document.querySelector<HTMLSelectElement>('#pin-sink-select');
+  const radioSelect = document.querySelector<HTMLSelectElement>('#pin-radio-select');
   const antennaSelect = document.querySelector<HTMLSelectElement>('#pin-antenna-select');
 
-  const sinkRadioId = sinkSelect?.value || '';
-  const sinkAntennaId = antennaSelect?.value || '';
-  if (!sinkRadioId || !sinkAntennaId) {
-    alert('Select sink radio and sink antenna before adding sink pins from map clicks.');
+  const radioId = radioSelect?.value || '';
+  const antennaId = antennaSelect?.value || '';
+  if (!radioId || !antennaId) {
+    alert(`Select ${pinPaneTab === 'source' ? 'source' : 'sink'} radio and antenna before adding pins from map clicks.`);
     return;
   }
 
   workspace.pins.push({
     id: uid(),
-    name: nameInput?.value.trim() || `Sink ${workspace.pins.length + 1}`,
+    name: nameInput?.value.trim() || `${pinPaneTab === 'source' ? 'Source' : 'Sink'} ${workspace.pins.length + 1}`,
     latitude: lat,
     longitude: lon,
-    sinkRadioId,
-    sinkAntennaId
+    kind: pinPaneTab,
+    radioId,
+    antennaId
   });
+
+  if (pinPaneTab === 'source') {
+    selectedSourceId = radioId;
+    selectedTxAntennaId = antennaId;
+    txLatitude = lat;
+    txLongitude = lon;
+  } else {
+    selectedRxAntennaId = antennaId;
+  }
 
   await saveWorkspace(workspace);
   captureMapViewport();
@@ -958,13 +947,6 @@ function initMap(): void {
       latInput.value = String(lat);
       lonInput.value = String(lon);
     }
-    if (clickBindMode === 'source') {
-      txLatitude = lat;
-      txLongitude = lon;
-      captureMapViewport();
-      render();
-      return;
-    }
     void addPinFromClick(lat, lon);
   });
   map.on('moveend', () => {
@@ -980,7 +962,7 @@ function initMap(): void {
     marker.remove();
   }
   mapMarkers = workspace.pins.map((pin) => {
-    const marker = new maplibregl.Marker({ color: '#dc2626' }).setLngLat([pin.longitude, pin.latitude]).setPopup(
+    const marker = new maplibregl.Marker({ color: pin.kind === 'source' ? '#dc2626' : '#2563eb' }).setLngLat([pin.longitude, pin.latitude]).setPopup(
       new maplibregl.Popup().setHTML(`<strong>${escapeHtml(pin.name)}</strong>`)
     );
     marker.addTo(map as maplibregl.Map);
@@ -1278,10 +1260,29 @@ function normalizeWorkspace(work: WorkspaceSnapshot): WorkspaceSnapshot {
     requiredSnrDb: sink.requiredSnrDb ?? 15
   }));
 
+  const pins = work.pins.map((pin) => {
+    const legacy = pin as unknown as {
+      sinkRadioId?: string;
+      sinkAntennaId?: string;
+      kind?: 'source' | 'sink';
+      radioId?: string;
+      antennaId?: string;
+    };
+
+    const kind = legacy.kind ?? 'sink';
+    return {
+      ...pin,
+      kind,
+      radioId: legacy.radioId ?? legacy.sinkRadioId ?? '',
+      antennaId: legacy.antennaId ?? legacy.sinkAntennaId ?? ''
+    };
+  });
+
   return {
     ...work,
     preferences,
-    sinks
+    sinks,
+    pins
   };
 }
 
@@ -1313,10 +1314,12 @@ function wireMapResizer(layout: HTMLDivElement, resizer: HTMLDivElement): void {
   const onMove = (event: PointerEvent) => {
     const rect = layout.getBoundingClientRect();
     const minWidth = 320;
-    const maxWidth = rect.width - 300;
+    const maxWidth = rect.width - 340;
     const next = Math.max(minWidth, Math.min(maxWidth, event.clientX - rect.left));
     mapPaneWidthPx = next;
+    pinPaneWidthPx = Math.max(300, Math.min(560, Math.round(next * 0.55)));
     layout.style.setProperty('--map-pane-width', `${next}px`);
+    layout.style.setProperty('--pin-pane-width', `${pinPaneWidthPx}px`);
     map?.resize();
   };
 
