@@ -83,3 +83,15 @@
 - Known Issues / Next Focus:
   - Finalize release build automation scripts and GitHub workflow.
 - Commit: this commit (`milestone(M6): preferences help polish v0.7.0`)
+
+## M7 - Release Automation
+- Date: 2026-03-05
+- Version: 0.8.0
+- Completed:
+  - Added release build script at `scripts/build-release.sh`.
+  - Added Vite single-file build configuration.
+  - Added GitHub Actions workflow `.github/workflows/release.yml` for tagged releases from `main`.
+  - Added standard project `.gitignore` entries for build outputs.
+- Known Issues / Next Focus:
+  - Validate full release build in an environment with Node/npm available.
+- Commit: this commit (`milestone(M7): release automation v0.8.0`)
