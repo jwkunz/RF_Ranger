@@ -162,3 +162,13 @@
 - Known Issues / Next Focus:
   - Optional: add explicit threshold column in Reports for easier user interpretation.
 - Commit: this commit (`milestone(M12): sink noise model + click mode controls v0.13.0`)
+
+## M13 - Welcome and Map Label Cleanup
+- Date: 2026-03-05
+- Version: 0.14.0
+- Completed:
+  - Updated map click mode label from "Add Sink Pin" to "Add RX Sink".
+  - Removed legal notice block from Welcome tab in preparation for dedicated Legal tab.
+- Known Issues / Next Focus:
+  - Add dedicated Legal tab and legal content rendering.
+- Commit: this commit (`milestone(M13): welcome/map label cleanup v0.14.0`)

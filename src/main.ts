@@ -2,7 +2,6 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibregl from 'maplibre-gl';
 import SimulationWorker from './simulationWorker?worker&inline';
 import './styles.css';
-import legalMarkdown from '../docs/LEGAL.md?raw';
 import manualMarkdown from '../docs/Manual.md?raw';
 import { DEFAULT_WORKSPACE } from './defaults';
 import { exportPinsKml, exportReportsCsv, exportWorkspaceJson, parsePinsKml, parseWorkspaceJson } from './io';
@@ -166,7 +165,6 @@ function renderWelcomeTab(): string {
         <img src="/RF_Ranger.png" alt="RF Ranger" class="splash__logo" />
         <h1>RF Ranger</h1>
         <p class="splash__subtitle">Radio experimentation planning toolkit</p>
-        <footer class="splash__legal">${escapeHtml(legalMarkdown).replace(/\n/g, '<br/>')}</footer>
       </div>
     </div>
   `;
@@ -207,7 +205,7 @@ function renderMapTab(): string {
           <legend>Map Click Mode</legend>
           <label class="inline-radio">
             <input type="radio" name="click-bind-mode" value="sink" ${clickBindMode === 'sink' ? 'checked' : ''} />
-            Add Sink Pin
+            Add RX Sink
           </label>
           <label class="inline-radio">
             <input type="radio" name="click-bind-mode" value="source" ${clickBindMode === 'source' ? 'checked' : ''} />
