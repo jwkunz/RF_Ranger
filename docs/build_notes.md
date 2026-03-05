@@ -71,3 +71,15 @@
 - Known Issues / Next Focus:
   - Improve manual rendering, UX polish, and finalize preferences/help behavior.
 - Commit: this commit (`milestone(M5): simulation reports v0.6.0`)
+
+## M6 - Preferences + Help Rendering + Polish
+- Date: 2026-03-05
+- Version: 0.7.0
+- Completed:
+  - Completed Help tab rendering from `docs/Manual.md`.
+  - Added generated table of contents and section anchors for manual navigation.
+  - Improved report/map UX with jump links and focused report highlighting.
+  - Applied additional layout polish for responsive map and manual display.
+- Known Issues / Next Focus:
+  - Finalize release build automation scripts and GitHub workflow.
+- Commit: this commit (`milestone(M6): preferences help polish v0.7.0`)

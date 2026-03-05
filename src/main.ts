@@ -314,9 +314,16 @@ function renderReportsTab(): string {
 }
 
 function renderHelpTab(): string {
+  const manual = renderManualWithToc(manualMarkdown);
   return `
     <h2>Help</h2>
-    <section class="panel manual">${renderMarkdownSimple(manualMarkdown)}</section>
+    <section class="panel manual">
+      <div class="manual__toc">
+        <h3>Contents</h3>
+        ${manual.tocHtml}
+      </div>
+      <div class="manual__body">${manual.bodyHtml}</div>
+    </section>
   `;
 }
 
@@ -1136,15 +1143,86 @@ function formatDistance(km: number): string {
   }
 }
 
-function renderMarkdownSimple(markdown: string): string {
-  return escapeHtml(markdown)
-    .replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
-    .replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
-    .replace(/^#\s+(.+)$/gm, '<h1>$1</h1>')
-    .replace(/^\-\s+(.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-    .replace(/\n\n/g, '<br/><br/>')
-    .replace(/\n/g, '<br/>');
+function renderManualWithToc(markdown: string): { tocHtml: string; bodyHtml: string } {
+  const lines = markdown.split('\n');
+  const headings: Array<{ level: number; text: string; slug: string }> = [];
+  const body: string[] = [];
+  let inList = false;
+
+  for (const line of lines) {
+    if (line.startsWith('### ')) {
+      if (inList) {
+        body.push('</ul>');
+        inList = false;
+      }
+      const text = line.slice(4).trim();
+      const slug = slugify(text);
+      headings.push({ level: 3, text, slug });
+      body.push(`<h3 id="${slug}">${escapeHtml(text)}</h3>`);
+      continue;
+    }
+    if (line.startsWith('## ')) {
+      if (inList) {
+        body.push('</ul>');
+        inList = false;
+      }
+      const text = line.slice(3).trim();
+      const slug = slugify(text);
+      headings.push({ level: 2, text, slug });
+      body.push(`<h2 id="${slug}">${escapeHtml(text)}</h2>`);
+      continue;
+    }
+    if (line.startsWith('# ')) {
+      if (inList) {
+        body.push('</ul>');
+        inList = false;
+      }
+      const text = line.slice(2).trim();
+      const slug = slugify(text);
+      headings.push({ level: 1, text, slug });
+      body.push(`<h1 id="${slug}">${escapeHtml(text)}</h1>`);
+      continue;
+    }
+    if (line.startsWith('- ')) {
+      if (!inList) {
+        body.push('<ul>');
+        inList = true;
+      }
+      body.push(`<li>${escapeHtml(line.slice(2).trim())}</li>`);
+      continue;
+    }
+
+    if (inList) {
+      body.push('</ul>');
+      inList = false;
+    }
+
+    if (line.trim()) {
+      body.push(`<p>${escapeHtml(line.trim())}</p>`);
+    }
+  }
+
+  if (inList) {
+    body.push('</ul>');
+  }
+
+  const tocItems = headings
+    .filter((heading) => heading.level <= 3)
+    .map((heading) => `<li class="toc-level-${heading.level}"><a href="#${heading.slug}">${escapeHtml(heading.text)}</a></li>`)
+    .join('');
+
+  return {
+    tocHtml: `<ul>${tocItems}</ul>`,
+    bodyHtml: body.join('\n')
+  };
+}
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
 }
 
 function toNumber(value: FormDataEntryValue | null): number {
