@@ -1,6 +1,7 @@
 import type { AntennaModel, MapPin, PropagationModel, RadioSink, RadioSource, SimulationResultRow } from './types';
 
 interface SimulationInput {
+  sourceLabel: string;
   source: RadioSource;
   txAntenna: AntennaModel;
   fallbackRxAntenna: AntennaModel;
@@ -71,7 +72,7 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
 
       rows.push({
         sinkPinId: sinkDef.pin.id,
-        sourceName: input.source.name,
+        sourceName: input.sourceLabel,
         sinkName: sinkDef.pin.name,
         transmitterEirpDbm,
         distanceKm,
@@ -153,9 +154,12 @@ function dbmToWatts(dbm: number): number {
 }
 
 function thermalNoiseDbm(temperatureK: number, bandwidthHz: number, noiseFigureDb: number): number {
+  const t0 = 290;
+  const noiseFactor = Math.pow(10, noiseFigureDb / 10);
+  const receiverEquivalentTempK = t0 * Math.max(noiseFactor - 1, 0);
   const boltzmann = 1.380649e-23;
-  const noiseWatts = boltzmann * Math.max(temperatureK, 1) * Math.max(bandwidthHz, 1);
-  return 10 * Math.log10(noiseWatts * 1000) + noiseFigureDb;
+  const noiseWatts = boltzmann * Math.max(temperatureK + receiverEquivalentTempK, 1) * Math.max(bandwidthHz, 1);
+  return 10 * Math.log10(noiseWatts * 1000);
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {

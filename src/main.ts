@@ -52,6 +52,7 @@ interface ProgressState {
 }
 
 interface SimulationWorkerInput {
+  sourceLabel: string;
   source: RadioSource;
   txAntenna: AntennaModel;
   fallbackRxAntenna: AntennaModel;
@@ -86,6 +87,7 @@ let activePropagationType: PropagationModelType = 'Free Space';
 let map: maplibregl.Map | null = null;
 let mapMarkers: maplibregl.Marker[] = [];
 let selectedSourceId = '';
+let selectedSourcePinId = '';
 let selectedTxAntennaId = '';
 let selectedPropagationModelId = '';
 let selectedRxAntennaId = '';
@@ -274,18 +276,21 @@ function renderSimulationTab(): string {
         `<option value="${model.id}" ${model.id === selectedPropagationModelId ? 'selected' : ''}>${escapeHtml(model.name)} (${model.modelType})</option>`
     )
     .join('');
+  const sourcePinOptions = workspace.pins
+    .filter((pin) => pin.kind === 'source')
+    .map((pin) => {
+      const radio = workspace.sources.find((entry) => entry.id === pin.radioId);
+      const label = `${pin.name}${radio ? ` (${radio.name})` : ''}`;
+      return `<option value="${pin.id}" ${pin.id === selectedSourcePinId ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+    })
+    .join('');
   const percent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
 
   return `
     <h2>Simulation</h2>
     <section class="panel stack simulation-panel">
-      <label>TX Latitude<input id="sim-tx-lat" type="number" step="0.000001" value="${txLatitude}" /></label>
-      <label>TX Longitude<input id="sim-tx-lon" type="number" step="0.000001" value="${txLongitude}" /></label>
-      <label>TX Power Model (Source)
-        <select id="sim-source-select">${sourceOptions || '<option value="">No source available</option>'}</select>
-      </label>
-      <label>TX Antenna Gain Model
-        <select id="sim-tx-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
+      <label>Source Pin
+        <select id="sim-source-pin-select">${sourcePinOptions || '<option value="">No source pins available</option>'}</select>
       </label>
       <label>Propagation Loss Model
         <select id="sim-propagation-select">${propagationOptions || '<option value="">No model available</option>'}</select>
@@ -705,16 +710,12 @@ function wireMapEvents(): void {
 }
 
 function wireSimulationEvents(): void {
-  const sourceSelect = document.querySelector<HTMLSelectElement>('#sim-source-select');
-  const txAntennaSelect = document.querySelector<HTMLSelectElement>('#sim-tx-antenna-select');
+  const sourcePinSelect = document.querySelector<HTMLSelectElement>('#sim-source-pin-select');
   const propagationSelect = document.querySelector<HTMLSelectElement>('#sim-propagation-select');
   const rxAntennaSelect = document.querySelector<HTMLSelectElement>('#sim-rx-antenna-select');
 
-  sourceSelect?.addEventListener('change', () => {
-    selectedSourceId = sourceSelect.value;
-  });
-  txAntennaSelect?.addEventListener('change', () => {
-    selectedTxAntennaId = txAntennaSelect.value;
+  sourcePinSelect?.addEventListener('change', () => {
+    selectedSourcePinId = sourcePinSelect.value;
   });
   propagationSelect?.addEventListener('change', () => {
     selectedPropagationModelId = propagationSelect.value;
@@ -725,15 +726,6 @@ function wireSimulationEvents(): void {
 
   document.querySelector<HTMLButtonElement>('#sim-calc')?.addEventListener('click', async () => {
     await runSimulation();
-  });
-
-  const txLatInput = document.querySelector<HTMLInputElement>('#sim-tx-lat');
-  const txLonInput = document.querySelector<HTMLInputElement>('#sim-tx-lon');
-  txLatInput?.addEventListener('change', () => {
-    txLatitude = Number.parseFloat(txLatInput.value);
-  });
-  txLonInput?.addEventListener('change', () => {
-    txLongitude = Number.parseFloat(txLonInput.value);
   });
 }
 
@@ -756,13 +748,14 @@ function wireReportsEvents(): void {
 }
 
 async function runSimulation(): Promise<void> {
-  const source = workspace.sources.find((entry) => entry.id === selectedSourceId);
-  const txAntenna = workspace.antennas.find((entry) => entry.id === selectedTxAntennaId);
+  const sourcePin = workspace.pins.find((entry) => entry.id === selectedSourcePinId && entry.kind === 'source');
+  const source = workspace.sources.find((entry) => entry.id === sourcePin?.radioId);
+  const txAntenna = workspace.antennas.find((entry) => entry.id === sourcePin?.antennaId);
   const propagationModel = workspace.propagationModels.find((entry) => entry.id === selectedPropagationModelId);
   const fallbackRxAntenna = workspace.antennas.find((entry) => entry.id === selectedRxAntennaId);
 
-  if (!source || !txAntenna || !propagationModel || !fallbackRxAntenna) {
-    alert('Select source, TX antenna, propagation model, and RX antenna before calculation.');
+  if (!sourcePin || !source || !txAntenna || !propagationModel || !fallbackRxAntenna) {
+    alert('Select a source pin, propagation model, and RX antenna before calculation.');
     return;
   }
 
@@ -791,13 +784,14 @@ async function runSimulation(): Promise<void> {
   const worker = new SimulationWorker();
 
   const input: SimulationWorkerInput = {
+    sourceLabel: sourcePin.name,
     source,
     txAntenna,
     fallbackRxAntenna,
     propagationModel,
     sinks,
-    txLatitude,
-    txLongitude
+    txLatitude: sourcePin.latitude,
+    txLongitude: sourcePin.longitude
   };
 
   worker.onmessage = async (event: MessageEvent<SimulationWorkerMessage>) => {
@@ -865,6 +859,7 @@ async function addPinFromForm(): Promise<void> {
   });
 
   if (pinPaneTab === 'source') {
+    selectedSourcePinId = workspace.pins[workspace.pins.length - 1].id;
     selectedSourceId = radioId;
     selectedTxAntennaId = antennaId;
     txLatitude = lat;
@@ -901,6 +896,7 @@ async function addPinFromClick(lat: number, lon: number): Promise<void> {
   });
 
   if (pinPaneTab === 'source') {
+    selectedSourcePinId = workspace.pins[workspace.pins.length - 1].id;
     selectedSourceId = radioId;
     selectedTxAntennaId = antennaId;
     txLatitude = lat;
@@ -1293,6 +1289,11 @@ function normalizeWorkspace(work: WorkspaceSnapshot): WorkspaceSnapshot {
 }
 
 function ensureSelectionDefaults(): void {
+  const sourcePins = workspace.pins.filter((entry) => entry.kind === 'source');
+  if (!sourcePins.some((entry) => entry.id === selectedSourcePinId)) {
+    selectedSourcePinId = sourcePins[0]?.id ?? '';
+  }
+
   if (!workspace.sources.some((entry) => entry.id === selectedSourceId)) {
     selectedSourceId = workspace.sources[0]?.id ?? '';
   }

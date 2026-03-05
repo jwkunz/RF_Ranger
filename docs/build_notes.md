@@ -253,3 +253,16 @@
 - Known Issues / Next Focus:
   - Optional: add unit toggles for propagation loss display precision.
 - Commit: this commit (`milestone(M19): report eirp/loss/source updates v0.20.0`)
+
+## M20 - Simulation Source Pin Selection + Receiver Noise Temperature Model
+- Date: 2026-03-05
+- Version: 0.21.0
+- Completed:
+  - Updated Simulation tab to select source via source-pin dropdown from Map View definitions.
+  - Simulation now derives TX radio, TX antenna, and TX coordinates directly from selected source pin.
+  - Report source label now uses selected source pin name.
+  - Updated noise floor model to use `k_b * (T_env + T_recv) * BW`.
+  - Implemented `T_recv` derivation from noise figure: `T_recv = T0 * (F - 1)` with `F = 10^(NF/10)` and `T0 = 290K`.
+- Known Issues / Next Focus:
+  - Optional: expose computed `T_recv` and total noise temperature in Reports for transparency.
+- Commit: this commit (`milestone(M20): source pin sim + noise temp model v0.21.0`)
