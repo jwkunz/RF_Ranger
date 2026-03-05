@@ -159,3 +159,40 @@ textarea {
   padding: 0.55rem 0.7rem;
   cursor: pointer;
 }
+
+.panel {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+}
+
+.grid-form {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid #94a3b8;
+  padding: 0.45rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+fieldset.param-grid {
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}

@@ -34,3 +34,14 @@
 - Known Issues / Next Focus:
   - Add full CRUD UI for radios, antennas, and propagation models.
 - Commit: this commit (`milestone(M2): domain persistence io core v0.3.0`)
+
+## M3 - CRUD Tabs (Radios/Antennas/Propagation Models)
+- Date: 2026-03-05
+- Version: 0.4.0
+- Completed:
+  - Implemented source/sink radio create, view, edit, and delete flows.
+  - Implemented antenna create, view, edit, and delete flows.
+  - Implemented propagation model CRUD with parameter editor forms for all 8 model types.
+- Known Issues / Next Focus:
+  - Add map integration, sink pin placement, and KML/geocoding.
+- Commit: this commit (`milestone(M3): crud tabs v0.4.0`)
