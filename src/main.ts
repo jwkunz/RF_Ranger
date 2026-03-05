@@ -76,9 +76,10 @@ interface SimulationErrorMessage {
 }
 
 type SimulationWorkerMessage = SimulationProgressMessage | SimulationCompleteMessage | SimulationErrorMessage;
+const SPLASH_SESSION_KEY = 'rf-ranger-splash-dismissed';
 
 let selectedTab: TabId = 'map';
-let splashDismissed = false;
+let splashDismissed = readSplashDismissed();
 let workspace: WorkspaceSnapshot = structuredClone(DEFAULT_WORKSPACE);
 let activePropagationType: PropagationModelType = 'Free Space';
 let map: maplibregl.Map | null = null;
@@ -123,6 +124,7 @@ function render(): void {
     const enterButton = document.querySelector<HTMLButtonElement>('#enter-app');
     enterButton?.addEventListener('click', () => {
       splashDismissed = true;
+      writeSplashDismissed(true);
       render();
     });
     return;
@@ -210,7 +212,7 @@ function renderMapTab(): string {
   return `
     <h2>Map View</h2>
     <div class="map-layout">
-      <aside class="panel stack map-controls">
+      <aside class="panel stack map-controls map-controls--left">
         <h3>Simulation Inputs</h3>
         <label>TX Latitude<input id="tx-lat" type="number" step="0.000001" value="${txLatitude}" /></label>
         <label>TX Longitude<input id="tx-lon" type="number" step="0.000001" value="${txLongitude}" /></label>
@@ -232,7 +234,12 @@ function renderMapTab(): string {
           <progress value="${progress.completed}" max="${Math.max(progress.total, 1)}"></progress>
           <div>${percent}%</div>
         </div>
-        <h3>Add Sink Pin</h3>
+      </aside>
+      <section class="panel map-panel">
+        <div id="map-canvas"></div>
+      </section>
+      <aside class="panel stack map-controls map-controls--right">
+        <h3>Add Pins</h3>
         <label>Pin Name<input id="pin-name" placeholder="Sink name" /></label>
         <label>Bind Sink Radio
           <select id="pin-sink-select">${sinkOptions || '<option value="">No sink radio available</option>'}</select>
@@ -252,12 +259,9 @@ function renderMapTab(): string {
           <label class="import-label">Import KML<input id="import-kml" type="file" accept=".kml,application/vnd.google-earth.kml+xml" /></label>
         </div>
       </aside>
-      <section class="panel map-panel">
-        <div id="map-canvas"></div>
-      </section>
     </div>
     <section class="panel">
-      <h3>Defined Sink Pins</h3>
+      <h3>Defined Pins</h3>
       <table>
         <thead><tr><th>Name</th><th>Coordinates</th><th>Sink Radio</th><th>Sink Antenna</th><th>Actions</th></tr></thead>
         <tbody>${pinRows || '<tr><td colspan="5">No sink pins yet.</td></tr>'}</tbody>
@@ -775,43 +779,104 @@ async function addPinFromForm(): Promise<void> {
   render();
 }
 
+async function promptPinBindingFromMapClick(lat: number, lon: number): Promise<void> {
+  const bindingRaw = prompt("Bind clicked location as 'source' or 'sink' (leave blank to cancel):", 'sink');
+  if (!bindingRaw) {
+    return;
+  }
+
+  const binding = bindingRaw.trim().toLowerCase();
+  if (binding === 'source') {
+    txLatitude = lat;
+    txLongitude = lon;
+    render();
+    return;
+  }
+
+  if (binding !== 'sink') {
+    alert("Invalid selection. Enter either 'source' or 'sink'.");
+    return;
+  }
+
+  if (!workspace.sinks.length || !workspace.antennas.length) {
+    alert('Create at least one sink radio and one antenna before adding sink pins from map clicks.');
+    return;
+  }
+
+  const sinkIndex = prompt(
+    `Select sink radio number:\\n${workspace.sinks.map((sink, i) => `${i + 1}) ${sink.name}`).join('\\n')}`,
+    '1'
+  );
+  const sinkIdx = Number.parseInt(sinkIndex ?? '', 10) - 1;
+  if (!Number.isInteger(sinkIdx) || sinkIdx < 0 || sinkIdx >= workspace.sinks.length) {
+    alert('Invalid sink selection.');
+    return;
+  }
+
+  const antennaIndex = prompt(
+    `Select sink antenna number:\\n${workspace.antennas.map((antenna, i) => `${i + 1}) ${antenna.name}`).join('\\n')}`,
+    '1'
+  );
+  const antennaIdx = Number.parseInt(antennaIndex ?? '', 10) - 1;
+  if (!Number.isInteger(antennaIdx) || antennaIdx < 0 || antennaIdx >= workspace.antennas.length) {
+    alert('Invalid antenna selection.');
+    return;
+  }
+
+  workspace.pins.push({
+    id: uid(),
+    name: `Sink ${workspace.pins.length + 1}`,
+    latitude: lat,
+    longitude: lon,
+    sinkRadioId: workspace.sinks[sinkIdx].id,
+    sinkAntennaId: workspace.antennas[antennaIdx].id
+  });
+
+  await saveWorkspace(workspace);
+  render();
+}
+
 function initMap(): void {
   const mapCanvas = document.querySelector<HTMLDivElement>('#map-canvas');
   if (!mapCanvas) {
     return;
   }
 
-  if (!map) {
-    map = new maplibregl.Map({
-      container: mapCanvas,
-      style: {
-        version: 8,
-        sources: {
-          osm: {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors'
-          }
-        },
-        layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
-      },
-      center: [txLongitude, txLatitude],
-      zoom: 4
-    });
-
-    map.addControl(new maplibregl.NavigationControl(), 'top-right');
-    map.on('click', (event) => {
-      const latInput = document.querySelector<HTMLInputElement>('#pin-lat');
-      const lonInput = document.querySelector<HTMLInputElement>('#pin-lon');
-      if (latInput && lonInput) {
-        latInput.value = event.lngLat.lat.toFixed(6);
-        lonInput.value = event.lngLat.lng.toFixed(6);
-      }
-    });
-  } else {
-    map.resize();
+  if (map) {
+    map.remove();
+    map = null;
   }
+
+  map = new maplibregl.Map({
+    container: mapCanvas,
+    style: {
+      version: 8,
+      sources: {
+        osm: {
+          type: 'raster',
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          attribution: '&copy; OpenStreetMap contributors'
+        }
+      },
+      layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
+    },
+    center: [txLongitude, txLatitude],
+    zoom: 4
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+  map.on('click', (event) => {
+    const lat = Number.parseFloat(event.lngLat.lat.toFixed(6));
+    const lon = Number.parseFloat(event.lngLat.lng.toFixed(6));
+    const latInput = document.querySelector<HTMLInputElement>('#pin-lat');
+    const lonInput = document.querySelector<HTMLInputElement>('#pin-lon');
+    if (latInput && lonInput) {
+      latInput.value = String(lat);
+      lonInput.value = String(lon);
+    }
+    void promptPinBindingFromMapClick(lat, lon);
+  });
 
   for (const marker of mapMarkers) {
     marker.remove();
@@ -1253,6 +1318,26 @@ function requireAppRoot(): HTMLDivElement {
     throw new Error('App root not found');
   }
   return found;
+}
+
+function readSplashDismissed(): boolean {
+  try {
+    return window.sessionStorage.getItem(SPLASH_SESSION_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeSplashDismissed(value: boolean): void {
+  try {
+    if (value) {
+      window.sessionStorage.setItem(SPLASH_SESSION_KEY, '1');
+    } else {
+      window.sessionStorage.removeItem(SPLASH_SESSION_KEY);
+    }
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 render();

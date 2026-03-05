@@ -119,3 +119,17 @@
 - Known Issues / Next Focus:
   - Optional: run tag-driven GitHub release workflow on remote.
 - Commit: this commit (`milestone(M9): release script validation v0.10.0`)
+
+## M10 - Map UX and Theming Fixes
+- Date: 2026-03-05
+- Version: 0.11.0
+- Completed:
+  - Changed default theme to dark mode for new workspaces.
+  - Improved map consistency by fully re-initializing MapLibre instance on Map tab render.
+  - Moved Add Pins controls to the right side of Map View.
+  - Renamed labels: "Add Sink Pin" -> "Add Pins", "Defined Sink Pins" -> "Defined Pins".
+  - Added click-on-map binding prompt to bind clicked location as source or sink.
+  - Added session-scoped splash dismissal memory so refresh does not force title screen in same session.
+- Known Issues / Next Focus:
+  - Optional: replace prompt-based source/sink binding with modal UX.
+- Commit: this commit (`milestone(M10): map ux and theme fixes v0.11.0`)

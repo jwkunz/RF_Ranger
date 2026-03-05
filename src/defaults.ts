@@ -8,7 +8,7 @@ export const DEFAULT_WORKSPACE: WorkspaceSnapshot = {
   propagationModels: [],
   pins: [],
   preferences: {
-    theme: 'light',
+    theme: 'dark',
     powerUnit: 'dBm',
     distanceUnit: 'km',
     snrThresholdDb: 10
