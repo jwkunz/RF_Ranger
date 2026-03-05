@@ -45,3 +45,16 @@
 - Known Issues / Next Focus:
   - Add map integration, sink pin placement, and KML/geocoding.
 - Commit: this commit (`milestone(M3): crud tabs v0.4.0`)
+
+## M4 - Map View + Pin/KML + Geocoding
+- Date: 2026-03-05
+- Version: 0.5.0
+- Completed:
+  - Added Map View layout with model selectors and map workspace.
+  - Integrated MapLibre + OSM tile style scaffolding.
+  - Added sink pin creation from coordinates and Nominatim geocoding.
+  - Enforced sink radio and sink antenna binding requirement for new pins.
+  - Added KML export/import with sink bindings stored in `ExtendedData`.
+- Known Issues / Next Focus:
+  - Add simulation engine, progress, and reports integration.
+- Commit: this commit (`milestone(M4): map pin kml geocoding v0.5.0`)

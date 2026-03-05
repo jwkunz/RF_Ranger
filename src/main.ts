@@ -1,7 +1,9 @@
+import 'maplibre-gl/dist/maplibre-gl.css';
+import maplibregl from 'maplibre-gl';
 import './styles.css';
 import legalMarkdown from '../docs/LEGAL.md?raw';
 import { DEFAULT_WORKSPACE } from './defaults';
-import { exportWorkspaceJson, parseWorkspaceJson } from './io';
+import { exportPinsKml, exportWorkspaceJson, parsePinsKml, parseWorkspaceJson } from './io';
 import { loadWorkspace, saveWorkspace } from './storage';
 import type {
   AntennaModel,
@@ -40,6 +42,12 @@ let selectedTab: TabId = 'map';
 let splashDismissed = false;
 let workspace: WorkspaceSnapshot = structuredClone(DEFAULT_WORKSPACE);
 let activePropagationType: PropagationModelType = 'Free Space';
+let map: maplibregl.Map | null = null;
+let mapMarkers: maplibregl.Marker[] = [];
+let selectedSourceId = '';
+let selectedTxAntennaId = '';
+let selectedPropagationModelId = '';
+let selectedRxAntennaId = '';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) {
@@ -50,6 +58,10 @@ void init();
 
 async function init(): Promise<void> {
   workspace = await loadWorkspace();
+  selectedSourceId = workspace.sources[0]?.id ?? '';
+  selectedTxAntennaId = workspace.antennas[0]?.id ?? '';
+  selectedPropagationModelId = workspace.propagationModels[0]?.id ?? '';
+  selectedRxAntennaId = workspace.antennas[0]?.id ?? '';
   applyTheme();
   render();
 }
@@ -103,7 +115,7 @@ function render(): void {
 function renderTabContent(tabId: TabId): string {
   switch (tabId) {
     case 'map':
-      return '<h2>Map View</h2><p>Map and sink pin workflows are in progress.</p>';
+      return renderMapTab();
     case 'radios':
       return renderRadiosTab();
     case 'antennas':
@@ -119,6 +131,88 @@ function renderTabContent(tabId: TabId): string {
     default:
       return '<h2>RF Ranger</h2>';
   }
+}
+
+function renderMapTab(): string {
+  const sourceOptions = workspace.sources
+    .map((source) => `<option value="${source.id}" ${source.id === selectedSourceId ? 'selected' : ''}>${escapeHtml(source.name)}</option>`)
+    .join('');
+  const antennaOptions = workspace.antennas
+    .map((antenna) => `<option value="${antenna.id}" ${antenna.id === selectedTxAntennaId ? 'selected' : ''}>${escapeHtml(antenna.name)}</option>`)
+    .join('');
+  const propagationOptions = workspace.propagationModels
+    .map(
+      (model) =>
+        `<option value="${model.id}" ${model.id === selectedPropagationModelId ? 'selected' : ''}>${escapeHtml(model.name)} (${model.modelType})</option>`
+    )
+    .join('');
+  const sinkOptions = workspace.sinks.map((sink) => `<option value="${sink.id}">${escapeHtml(sink.name)}</option>`).join('');
+
+  const pinRows = workspace.pins
+    .map((pin) => {
+      const sink = workspace.sinks.find((entry) => entry.id === pin.sinkRadioId);
+      const antenna = workspace.antennas.find((entry) => entry.id === pin.sinkAntennaId);
+      return `<tr>
+        <td>${escapeHtml(pin.name)}</td>
+        <td>${pin.latitude.toFixed(6)}, ${pin.longitude.toFixed(6)}</td>
+        <td>${escapeHtml(sink?.name ?? 'unknown')}</td>
+        <td>${escapeHtml(antenna?.name ?? 'unknown')}</td>
+        <td><button data-delete-pin="${pin.id}">Delete</button></td>
+      </tr>`;
+    })
+    .join('');
+
+  return `
+    <h2>Map View</h2>
+    <div class="map-layout">
+      <aside class="panel stack map-controls">
+        <h3>Simulation Inputs</h3>
+        <label>TX Power Model (Source)
+          <select id="map-source-select">${sourceOptions || '<option value="">No source available</option>'}</select>
+        </label>
+        <label>TX Antenna Gain Model
+          <select id="map-tx-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
+        </label>
+        <label>Propagation Loss Model
+          <select id="map-propagation-select">${propagationOptions || '<option value="">No model available</option>'}</select>
+        </label>
+        <label>RX Antenna Gain Model
+          <select id="map-rx-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
+        </label>
+        <button id="map-calc" class="primary-btn">Calculate</button>
+        <h3>Add Sink Pin</h3>
+        <label>Pin Name<input id="pin-name" placeholder="Sink name" /></label>
+        <label>Bind Sink Radio
+          <select id="pin-sink-select">${sinkOptions || '<option value="">No sink radio available</option>'}</select>
+        </label>
+        <label>Bind Sink Antenna
+          <select id="pin-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
+        </label>
+        <label>Latitude<input id="pin-lat" type="number" step="0.000001" /></label>
+        <label>Longitude<input id="pin-lon" type="number" step="0.000001" /></label>
+        <button id="add-pin-coord">Add Pin (Coordinates)</button>
+        <label>Address Search
+          <input id="geocode-input" placeholder="Address" />
+        </label>
+        <button id="add-pin-address">Geocode + Add Pin</button>
+        <div class="action-row">
+          <button id="export-kml">Export KML</button>
+          <label class="import-label">Import KML<input id="import-kml" type="file" accept=".kml,application/vnd.google-earth.kml+xml" /></label>
+        </div>
+      </aside>
+      <section class="panel map-panel">
+        <div id="map-canvas"></div>
+      </section>
+    </div>
+    <section class="panel">
+      <h3>Defined Sink Pins</h3>
+      <table>
+        <thead><tr><th>Name</th><th>Coordinates</th><th>Sink Radio</th><th>Sink Antenna</th><th>Actions</th></tr></thead>
+        <tbody>${pinRows || '<tr><td colspan="5">No sink pins yet.</td></tr>'}</tbody>
+      </table>
+      <p class="muted">Tip: Click on the map to set coordinate fields, then add pin with required sink bindings.</p>
+    </section>
+  `;
 }
 
 function renderRadiosTab(): string {
@@ -343,6 +437,195 @@ function wireTabEvents(): void {
   if (selectedTab === 'propagation') {
     wirePropagationEvents();
   }
+  if (selectedTab === 'map') {
+    wireMapEvents();
+  }
+}
+
+function wireMapEvents(): void {
+  const sourceSelect = document.querySelector<HTMLSelectElement>('#map-source-select');
+  const txAntennaSelect = document.querySelector<HTMLSelectElement>('#map-tx-antenna-select');
+  const propagationSelect = document.querySelector<HTMLSelectElement>('#map-propagation-select');
+  const rxAntennaSelect = document.querySelector<HTMLSelectElement>('#map-rx-antenna-select');
+
+  sourceSelect?.addEventListener('change', () => {
+    selectedSourceId = sourceSelect.value;
+  });
+  txAntennaSelect?.addEventListener('change', () => {
+    selectedTxAntennaId = txAntennaSelect.value;
+  });
+  propagationSelect?.addEventListener('change', () => {
+    selectedPropagationModelId = propagationSelect.value;
+  });
+  rxAntennaSelect?.addEventListener('change', () => {
+    selectedRxAntennaId = rxAntennaSelect.value;
+  });
+
+  document.querySelector<HTMLButtonElement>('#add-pin-coord')?.addEventListener('click', async () => {
+    await addPinFromForm();
+  });
+
+  document.querySelector<HTMLButtonElement>('#add-pin-address')?.addEventListener('click', async () => {
+    const input = document.querySelector<HTMLInputElement>('#geocode-input');
+    if (!input?.value.trim()) {
+      alert('Enter an address first.');
+      return;
+    }
+    const result = await geocodeAddress(input.value.trim());
+    if (!result) {
+      alert('Address not found.');
+      return;
+    }
+    const latInput = document.querySelector<HTMLInputElement>('#pin-lat');
+    const lonInput = document.querySelector<HTMLInputElement>('#pin-lon');
+    if (latInput && lonInput) {
+      latInput.value = String(result.lat);
+      lonInput.value = String(result.lon);
+    }
+    await addPinFromForm();
+    map?.flyTo({ center: [result.lon, result.lat], zoom: 12 });
+  });
+
+  document.querySelector<HTMLButtonElement>('#export-kml')?.addEventListener('click', () => {
+    exportPinsKml(workspace.pins);
+  });
+
+  document.querySelector<HTMLInputElement>('#import-kml')?.addEventListener('change', async (event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) {
+      return;
+    }
+    const pins = await parsePinsKml(file);
+    const valid = pins.filter((pin) => pin.sinkRadioId && pin.sinkAntennaId);
+    workspace.pins.push(...valid);
+    await saveWorkspace(workspace);
+    render();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-delete-pin]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      workspace.pins = workspace.pins.filter((pin) => pin.id !== button.dataset.deletePin);
+      await saveWorkspace(workspace);
+      render();
+    });
+  });
+
+  document.querySelector<HTMLButtonElement>('#map-calc')?.addEventListener('click', () => {
+    alert('Simulation engine is implemented in milestone M5.');
+  });
+
+  initMap();
+}
+
+async function addPinFromForm(): Promise<void> {
+  const nameInput = document.querySelector<HTMLInputElement>('#pin-name');
+  const sinkSelect = document.querySelector<HTMLSelectElement>('#pin-sink-select');
+  const antennaSelect = document.querySelector<HTMLSelectElement>('#pin-antenna-select');
+  const latInput = document.querySelector<HTMLInputElement>('#pin-lat');
+  const lonInput = document.querySelector<HTMLInputElement>('#pin-lon');
+
+  const sinkRadioId = sinkSelect?.value || '';
+  const sinkAntennaId = antennaSelect?.value || '';
+  if (!sinkRadioId || !sinkAntennaId) {
+    alert('Pin requires bound sink radio and sink antenna.');
+    return;
+  }
+
+  const lat = Number.parseFloat(latInput?.value ?? '');
+  const lon = Number.parseFloat(lonInput?.value ?? '');
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    alert('Provide valid latitude and longitude.');
+    return;
+  }
+
+  workspace.pins.push({
+    id: uid(),
+    name: nameInput?.value.trim() || `Sink ${workspace.pins.length + 1}`,
+    latitude: lat,
+    longitude: lon,
+    sinkRadioId,
+    sinkAntennaId
+  });
+
+  await saveWorkspace(workspace);
+  render();
+}
+
+function initMap(): void {
+  const mapCanvas = document.querySelector<HTMLDivElement>('#map-canvas');
+  if (!mapCanvas) {
+    return;
+  }
+
+  if (!map) {
+    map = new maplibregl.Map({
+      container: mapCanvas,
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '&copy; OpenStreetMap contributors'
+          }
+        },
+        layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
+      },
+      center: [-98.5795, 39.8283],
+      zoom: 3
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    map.on('click', (event) => {
+      const latInput = document.querySelector<HTMLInputElement>('#pin-lat');
+      const lonInput = document.querySelector<HTMLInputElement>('#pin-lon');
+      if (latInput && lonInput) {
+        latInput.value = event.lngLat.lat.toFixed(6);
+        lonInput.value = event.lngLat.lng.toFixed(6);
+      }
+    });
+  } else {
+    map.resize();
+  }
+
+  for (const marker of mapMarkers) {
+    marker.remove();
+  }
+  mapMarkers = workspace.pins.map((pin) => {
+    const marker = new maplibregl.Marker({ color: '#dc2626' }).setLngLat([pin.longitude, pin.latitude]).setPopup(
+      new maplibregl.Popup().setHTML(`<strong>${escapeHtml(pin.name)}</strong>`)
+    );
+    marker.addTo(map as maplibregl.Map);
+    return marker;
+  });
+}
+
+async function geocodeAddress(query: string): Promise<{ lat: number; lon: number } | null> {
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('q', query);
+  url.searchParams.set('limit', '1');
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as Array<{ lat: string; lon: string }>;
+  if (!payload.length) {
+    return null;
+  }
+
+  return {
+    lat: Number.parseFloat(payload[0].lat),
+    lon: Number.parseFloat(payload[0].lon)
+  };
 }
 
 function wireRadiosEvents(): void {
@@ -359,6 +642,7 @@ function wireRadiosEvents(): void {
       noiseFigureDb: toNumber(data.get('noiseFigureDb'))
     };
     workspace.sources.push(source);
+    selectedSourceId ||= source.id;
     await saveWorkspace(workspace);
     render();
   });
@@ -386,6 +670,9 @@ function wireRadiosEvents(): void {
     button.addEventListener('click', async () => {
       const id = button.dataset.deleteSource;
       workspace.sources = workspace.sources.filter((source) => source.id !== id);
+      if (selectedSourceId === id) {
+        selectedSourceId = workspace.sources[0]?.id ?? '';
+      }
       await saveWorkspace(workspace);
       render();
     });
@@ -450,6 +737,8 @@ function wireAntennaEvents(): void {
       gainOverrideDb: rawGain ? Number.parseFloat(rawGain) : undefined
     };
     workspace.antennas.push(antenna);
+    selectedTxAntennaId ||= antenna.id;
+    selectedRxAntennaId ||= antenna.id;
     await saveWorkspace(workspace);
     render();
   });
@@ -458,6 +747,12 @@ function wireAntennaEvents(): void {
     button.addEventListener('click', async () => {
       const id = button.dataset.deleteAntenna;
       workspace.antennas = workspace.antennas.filter((entry) => entry.id !== id);
+      if (selectedTxAntennaId === id) {
+        selectedTxAntennaId = workspace.antennas[0]?.id ?? '';
+      }
+      if (selectedRxAntennaId === id) {
+        selectedRxAntennaId = workspace.antennas[0]?.id ?? '';
+      }
       await saveWorkspace(workspace);
       render();
     });
@@ -505,6 +800,7 @@ function wirePropagationEvents(): void {
     };
 
     workspace.propagationModels.push(model);
+    selectedPropagationModelId ||= model.id;
     await saveWorkspace(workspace);
     render();
   });
@@ -513,6 +809,9 @@ function wirePropagationEvents(): void {
     button.addEventListener('click', async () => {
       const id = button.dataset.deleteProp;
       workspace.propagationModels = workspace.propagationModels.filter((entry) => entry.id !== id);
+      if (selectedPropagationModelId === id) {
+        selectedPropagationModelId = workspace.propagationModels[0]?.id ?? '';
+      }
       await saveWorkspace(workspace);
       render();
     });
