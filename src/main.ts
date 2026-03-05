@@ -1,5 +1,6 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibregl from 'maplibre-gl';
+import SimulationWorker from './simulationWorker?worker&inline';
 import './styles.css';
 import legalMarkdown from '../docs/LEGAL.md?raw';
 import manualMarkdown from '../docs/Manual.md?raw';
@@ -91,10 +92,7 @@ let txLongitude = -98.5795;
 let progress: ProgressState = { running: false, completed: 0, total: 0, message: 'Idle' };
 let focusedReportPinId = '';
 
-const app = document.querySelector<HTMLDivElement>('#app');
-if (!app) {
-  throw new Error('App root not found');
-}
+const app = requireAppRoot();
 
 void init();
 
@@ -697,7 +695,7 @@ async function runSimulation(): Promise<void> {
   progress = { running: true, completed: 0, total: sinks.length, message: 'Starting' };
   render();
 
-  const worker = new Worker(new URL('./simulationWorker.ts', import.meta.url), { type: 'module' });
+  const worker = new SimulationWorker();
 
   const input: SimulationWorkerInput = {
     source,
@@ -1247,6 +1245,14 @@ function escapeHtml(raw: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+function requireAppRoot(): HTMLDivElement {
+  const found = document.querySelector<HTMLDivElement>('#app');
+  if (!found) {
+    throw new Error('App root not found');
+  }
+  return found;
 }
 
 render();

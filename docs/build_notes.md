@@ -95,3 +95,16 @@
 - Known Issues / Next Focus:
   - Validate full release build in an environment with Node/npm available.
 - Commit: this commit (`milestone(M7): release automation v0.8.0`)
+
+## M8 - Toolchain Validation + Single-File Hardening
+- Date: 2026-03-05
+- Version: 0.9.0
+- Completed:
+  - Added `package-lock.json` so `npm ci` works for local/CI reproducible installs.
+  - Updated TypeScript target/lib to ES2021 to match runtime usage (`replaceAll`).
+  - Refined app root typing to satisfy strict type-check.
+  - Converted simulation worker to inline bundle mode so release output is truly single-file.
+  - Validated `npm run check` and `npm run build` successfully.
+- Known Issues / Next Focus:
+  - Optional: refine simulation model fidelity and add automated tests.
+- Commit: this commit (`milestone(M8): toolchain hardening single-file v0.9.0`)
