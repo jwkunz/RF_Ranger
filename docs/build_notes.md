@@ -211,3 +211,16 @@
 - Known Issues / Next Focus:
   - Optional: hide pin-name field in TX mode to reduce clutter.
 - Commit: this commit (`milestone(M16): map click mode panel binding fix v0.17.0`)
+
+## M17 - Map Source Binding + Resizable Pane + Viewport Stability
+- Date: 2026-03-05
+- Version: 0.18.0
+- Completed:
+  - Fixed TX source binding reliability in Map View by enforcing valid default source/antenna selections.
+  - Added draggable vertical resizer between map pane and right-side panel for screen-size adjustment.
+  - Preserved map viewport (center/zoom) across pin add/delete/import operations.
+  - Removed initial/default green TX marker from map rendering.
+  - Prevented zoom reset behavior after adding pins by restoring map state on re-render.
+- Known Issues / Next Focus:
+  - Optional: persist resizer width preference in local workspace settings.
+- Commit: this commit (`milestone(M17): map source/resizer/viewport fix v0.18.0`)

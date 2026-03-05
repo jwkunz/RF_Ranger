@@ -91,6 +91,9 @@ let selectedPropagationModelId = '';
 let selectedRxAntennaId = '';
 let txLatitude = 39.8283;
 let txLongitude = -98.5795;
+let mapCenter: [number, number] | null = null;
+let mapZoom = 4;
+let mapPaneWidthPx: number | null = null;
 let clickBindMode: ClickBindMode = 'sink';
 let progress: ProgressState = { running: false, completed: 0, total: 0, message: 'Idle' };
 let focusedReportPinId = '';
@@ -102,10 +105,7 @@ void init();
 async function init(): Promise<void> {
   workspace = await loadWorkspace();
   workspace = normalizeWorkspace(workspace);
-  selectedSourceId = workspace.sources[0]?.id ?? '';
-  selectedTxAntennaId = workspace.antennas[0]?.id ?? '';
-  selectedPropagationModelId = workspace.propagationModels[0]?.id ?? '';
-  selectedRxAntennaId = workspace.antennas[0]?.id ?? '';
+  ensureSelectionDefaults();
   applyTheme();
   render();
 }
@@ -175,6 +175,7 @@ function renderWelcomeTab(): string {
 }
 
 function renderMapTab(): string {
+  ensureSelectionDefaults();
   const sourceOptions = workspace.sources
     .map((source) => `<option value="${source.id}" ${source.id === selectedSourceId ? 'selected' : ''}>${escapeHtml(source.name)}</option>`)
     .join('');
@@ -206,6 +207,7 @@ function renderMapTab(): string {
       <section class="panel map-panel">
         <div id="map-canvas"></div>
       </section>
+      <div id="map-resizer" class="map-resizer" role="separator" aria-orientation="vertical" aria-label="Resize map panel"></div>
       <aside class="panel stack map-controls map-controls--right">
         <h3>Add Pins</h3>
         <fieldset class="click-mode">
@@ -608,6 +610,11 @@ function wireTabEvents(): void {
 }
 
 function wireMapEvents(): void {
+  const layout = document.querySelector<HTMLDivElement>('.map-layout');
+  if (layout && mapPaneWidthPx) {
+    layout.style.setProperty('--map-pane-width', `${mapPaneWidthPx}px`);
+  }
+
   document.querySelectorAll<HTMLInputElement>('input[name="click-bind-mode"]').forEach((input) => {
     input.addEventListener('change', () => {
       if (input.checked) {
@@ -626,6 +633,11 @@ function wireMapEvents(): void {
   sourceAntennaBindSelect?.addEventListener('change', () => {
     selectedTxAntennaId = sourceAntennaBindSelect.value;
   });
+
+  const resizer = document.querySelector<HTMLDivElement>('#map-resizer');
+  if (layout && resizer) {
+    wireMapResizer(layout, resizer);
+  }
 
   document.querySelector<HTMLButtonElement>('#add-pin-coord')?.addEventListener('click', async () => {
     await addPinFromForm();
@@ -665,6 +677,7 @@ function wireMapEvents(): void {
     const valid = pins.filter((pin) => pin.sinkRadioId && pin.sinkAntennaId);
     workspace.pins.push(...valid);
     await saveWorkspace(workspace);
+    captureMapViewport();
     render();
   });
 
@@ -672,6 +685,7 @@ function wireMapEvents(): void {
     button.addEventListener('click', async () => {
       workspace.pins = workspace.pins.filter((pin) => pin.id !== button.dataset.deletePin);
       await saveWorkspace(workspace);
+      captureMapViewport();
       render();
     });
   });
@@ -840,6 +854,7 @@ async function addPinFromForm(): Promise<void> {
     selectedTxAntennaId = antennaSelect.value;
     txLatitude = lat;
     txLongitude = lon;
+    captureMapViewport();
     render();
     return;
   }
@@ -874,6 +889,7 @@ async function addPinFromForm(): Promise<void> {
   });
 
   await saveWorkspace(workspace);
+  captureMapViewport();
   render();
 }
 
@@ -899,6 +915,7 @@ async function addPinFromClick(lat: number, lon: number): Promise<void> {
   });
 
   await saveWorkspace(workspace);
+  captureMapViewport();
   render();
 }
 
@@ -927,8 +944,8 @@ function initMap(): void {
       },
       layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
     },
-    center: [txLongitude, txLatitude],
-    zoom: 4
+    center: mapCenter ?? [txLongitude, txLatitude],
+    zoom: mapZoom
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -944,10 +961,19 @@ function initMap(): void {
     if (clickBindMode === 'source') {
       txLatitude = lat;
       txLongitude = lon;
+      captureMapViewport();
       render();
       return;
     }
     void addPinFromClick(lat, lon);
+  });
+  map.on('moveend', () => {
+    if (!map) {
+      return;
+    }
+    const center = map.getCenter();
+    mapCenter = [center.lng, center.lat];
+    mapZoom = map.getZoom();
   });
 
   for (const marker of mapMarkers) {
@@ -960,12 +986,6 @@ function initMap(): void {
     marker.addTo(map as maplibregl.Map);
     return marker;
   });
-
-  const txMarker = new maplibregl.Marker({ color: '#16a34a' })
-    .setLngLat([txLongitude, txLatitude])
-    .setPopup(new maplibregl.Popup().setHTML('<strong>TX Source</strong>'));
-  txMarker.addTo(map as maplibregl.Map);
-  mapMarkers.push(txMarker);
 }
 
 async function geocodeAddress(query: string): Promise<{ lat: number; lon: number } | null> {
@@ -1040,6 +1060,7 @@ function wireRadiosEvents(): void {
         selectedSourceId = workspace.sources[0]?.id ?? '';
       }
       await saveWorkspace(workspace);
+      ensureSelectionDefaults();
       render();
     });
   });
@@ -1262,6 +1283,53 @@ function normalizeWorkspace(work: WorkspaceSnapshot): WorkspaceSnapshot {
     preferences,
     sinks
   };
+}
+
+function ensureSelectionDefaults(): void {
+  if (!workspace.sources.some((entry) => entry.id === selectedSourceId)) {
+    selectedSourceId = workspace.sources[0]?.id ?? '';
+  }
+  if (!workspace.antennas.some((entry) => entry.id === selectedTxAntennaId)) {
+    selectedTxAntennaId = workspace.antennas[0]?.id ?? '';
+  }
+  if (!workspace.antennas.some((entry) => entry.id === selectedRxAntennaId)) {
+    selectedRxAntennaId = workspace.antennas[0]?.id ?? '';
+  }
+  if (!workspace.propagationModels.some((entry) => entry.id === selectedPropagationModelId)) {
+    selectedPropagationModelId = workspace.propagationModels[0]?.id ?? '';
+  }
+}
+
+function captureMapViewport(): void {
+  if (!map) {
+    return;
+  }
+  const center = map.getCenter();
+  mapCenter = [center.lng, center.lat];
+  mapZoom = map.getZoom();
+}
+
+function wireMapResizer(layout: HTMLDivElement, resizer: HTMLDivElement): void {
+  const onMove = (event: PointerEvent) => {
+    const rect = layout.getBoundingClientRect();
+    const minWidth = 320;
+    const maxWidth = rect.width - 300;
+    const next = Math.max(minWidth, Math.min(maxWidth, event.clientX - rect.left));
+    mapPaneWidthPx = next;
+    layout.style.setProperty('--map-pane-width', `${next}px`);
+    map?.resize();
+  };
+
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  };
+
+  resizer.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
 }
 
 function applyTheme(): void {
