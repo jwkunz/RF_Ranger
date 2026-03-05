@@ -1,5 +1,7 @@
 export type TabId =
+  | 'welcome'
   | 'map'
+  | 'simulation'
   | 'radios'
   | 'antennas'
   | 'propagation'

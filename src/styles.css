@@ -200,7 +200,7 @@ fieldset.param-grid {
 .map-layout {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(260px, 360px) 1fr minmax(260px, 360px);
+  grid-template-columns: 1fr minmax(260px, 360px);
 }
 
 .map-controls {

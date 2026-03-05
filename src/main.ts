@@ -21,10 +21,12 @@ import type {
 } from './types';
 
 const tabs: Array<{ id: TabId; label: string }> = [
-  { id: 'map', label: 'Map View' },
+  { id: 'welcome', label: 'Welcome' },
   { id: 'radios', label: 'Radios' },
   { id: 'antennas', label: 'Antennas' },
   { id: 'propagation', label: 'Propagation Models' },
+  { id: 'map', label: 'Map View' },
+  { id: 'simulation', label: 'Simulation' },
   { id: 'reports', label: 'Reports' },
   { id: 'preferences', label: 'Preferences' },
   { id: 'help', label: 'Help' }
@@ -76,10 +78,8 @@ interface SimulationErrorMessage {
 }
 
 type SimulationWorkerMessage = SimulationProgressMessage | SimulationCompleteMessage | SimulationErrorMessage;
-const SPLASH_SESSION_KEY = 'rf-ranger-splash-dismissed';
 
-let selectedTab: TabId = 'map';
-let splashDismissed = readSplashDismissed();
+let selectedTab: TabId = 'welcome';
 let workspace: WorkspaceSnapshot = structuredClone(DEFAULT_WORKSPACE);
 let activePropagationType: PropagationModelType = 'Free Space';
 let map: maplibregl.Map | null = null;
@@ -108,28 +108,6 @@ async function init(): Promise<void> {
 }
 
 function render(): void {
-  if (!splashDismissed) {
-    app.innerHTML = `
-      <div class="splash">
-        <div class="splash__card">
-          <img src="/RF_Ranger.png" alt="RF Ranger" class="splash__logo" />
-          <h1>RF Ranger</h1>
-          <p class="splash__subtitle">Radio experimentation planning toolkit</p>
-          <button id="enter-app" class="primary-btn">Enter Application</button>
-          <footer class="splash__legal">${escapeHtml(legalMarkdown).replace(/\n/g, '<br/>')}</footer>
-        </div>
-      </div>
-    `;
-
-    const enterButton = document.querySelector<HTMLButtonElement>('#enter-app');
-    enterButton?.addEventListener('click', () => {
-      splashDismissed = true;
-      writeSplashDismissed(true);
-      render();
-    });
-    return;
-  }
-
   const tabButtons = tabs
     .map(
       (tab) =>
@@ -156,8 +134,12 @@ function render(): void {
 
 function renderTabContent(tabId: TabId): string {
   switch (tabId) {
+    case 'welcome':
+      return renderWelcomeTab();
     case 'map':
       return renderMapTab();
+    case 'simulation':
+      return renderSimulationTab();
     case 'radios':
       return renderRadiosTab();
     case 'antennas':
@@ -175,18 +157,22 @@ function renderTabContent(tabId: TabId): string {
   }
 }
 
+function renderWelcomeTab(): string {
+  return `
+    <div class="splash">
+      <div class="splash__card">
+        <img src="/RF_Ranger.png" alt="RF Ranger" class="splash__logo" />
+        <h1>RF Ranger</h1>
+        <p class="splash__subtitle">Radio experimentation planning toolkit</p>
+        <footer class="splash__legal">${escapeHtml(legalMarkdown).replace(/\n/g, '<br/>')}</footer>
+      </div>
+    </div>
+  `;
+}
+
 function renderMapTab(): string {
-  const sourceOptions = workspace.sources
-    .map((source) => `<option value="${source.id}" ${source.id === selectedSourceId ? 'selected' : ''}>${escapeHtml(source.name)}</option>`)
-    .join('');
   const antennaOptions = workspace.antennas
     .map((antenna) => `<option value="${antenna.id}" ${antenna.id === selectedTxAntennaId ? 'selected' : ''}>${escapeHtml(antenna.name)}</option>`)
-    .join('');
-  const propagationOptions = workspace.propagationModels
-    .map(
-      (model) =>
-        `<option value="${model.id}" ${model.id === selectedPropagationModelId ? 'selected' : ''}>${escapeHtml(model.name)} (${model.modelType})</option>`
-    )
     .join('');
   const sinkOptions = workspace.sinks.map((sink) => `<option value="${sink.id}">${escapeHtml(sink.name)}</option>`).join('');
 
@@ -207,34 +193,9 @@ function renderMapTab(): string {
     })
     .join('');
 
-  const percent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-
   return `
     <h2>Map View</h2>
     <div class="map-layout">
-      <aside class="panel stack map-controls map-controls--left">
-        <h3>Simulation Inputs</h3>
-        <label>TX Latitude<input id="tx-lat" type="number" step="0.000001" value="${txLatitude}" /></label>
-        <label>TX Longitude<input id="tx-lon" type="number" step="0.000001" value="${txLongitude}" /></label>
-        <label>TX Power Model (Source)
-          <select id="map-source-select">${sourceOptions || '<option value="">No source available</option>'}</select>
-        </label>
-        <label>TX Antenna Gain Model
-          <select id="map-tx-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
-        </label>
-        <label>Propagation Loss Model
-          <select id="map-propagation-select">${propagationOptions || '<option value="">No model available</option>'}</select>
-        </label>
-        <label>RX Antenna Gain Model
-          <select id="map-rx-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
-        </label>
-        <button id="map-calc" class="primary-btn" ${progress.running ? 'disabled' : ''}>Calculate</button>
-        <div class="progress-wrap">
-          <div>Progress: ${progress.message}</div>
-          <progress value="${progress.completed}" max="${Math.max(progress.total, 1)}"></progress>
-          <div>${percent}%</div>
-        </div>
-      </aside>
       <section class="panel map-panel">
         <div id="map-canvas"></div>
       </section>
@@ -267,6 +228,48 @@ function renderMapTab(): string {
         <tbody>${pinRows || '<tr><td colspan="5">No sink pins yet.</td></tr>'}</tbody>
       </table>
       <p class="muted">Tip: Click on the map to set coordinate fields, then add pin with required sink bindings.</p>
+    </section>
+  `;
+}
+
+function renderSimulationTab(): string {
+  const sourceOptions = workspace.sources
+    .map((source) => `<option value="${source.id}" ${source.id === selectedSourceId ? 'selected' : ''}>${escapeHtml(source.name)}</option>`)
+    .join('');
+  const antennaOptions = workspace.antennas
+    .map((antenna) => `<option value="${antenna.id}" ${antenna.id === selectedTxAntennaId ? 'selected' : ''}>${escapeHtml(antenna.name)}</option>`)
+    .join('');
+  const propagationOptions = workspace.propagationModels
+    .map(
+      (model) =>
+        `<option value="${model.id}" ${model.id === selectedPropagationModelId ? 'selected' : ''}>${escapeHtml(model.name)} (${model.modelType})</option>`
+    )
+    .join('');
+  const percent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+
+  return `
+    <h2>Simulation</h2>
+    <section class="panel stack simulation-panel">
+      <label>TX Latitude<input id="sim-tx-lat" type="number" step="0.000001" value="${txLatitude}" /></label>
+      <label>TX Longitude<input id="sim-tx-lon" type="number" step="0.000001" value="${txLongitude}" /></label>
+      <label>TX Power Model (Source)
+        <select id="sim-source-select">${sourceOptions || '<option value="">No source available</option>'}</select>
+      </label>
+      <label>TX Antenna Gain Model
+        <select id="sim-tx-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
+      </label>
+      <label>Propagation Loss Model
+        <select id="sim-propagation-select">${propagationOptions || '<option value="">No model available</option>'}</select>
+      </label>
+      <label>RX Antenna Gain Model
+        <select id="sim-rx-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
+      </label>
+      <button id="sim-calc" class="primary-btn" ${progress.running ? 'disabled' : ''}>Calculate</button>
+      <div class="progress-wrap">
+        <div>Progress: ${progress.message}</div>
+        <progress value="${progress.completed}" max="${Math.max(progress.total, 1)}"></progress>
+        <div>${percent}%</div>
+      </div>
     </section>
   `;
 }
@@ -542,6 +545,9 @@ function wireTabEvents(): void {
   if (selectedTab === 'preferences') {
     wirePreferencesEvents();
   }
+  if (selectedTab === 'simulation') {
+    wireSimulationEvents();
+  }
   if (selectedTab === 'radios') {
     wireRadiosEvents();
   }
@@ -560,24 +566,6 @@ function wireTabEvents(): void {
 }
 
 function wireMapEvents(): void {
-  const sourceSelect = document.querySelector<HTMLSelectElement>('#map-source-select');
-  const txAntennaSelect = document.querySelector<HTMLSelectElement>('#map-tx-antenna-select');
-  const propagationSelect = document.querySelector<HTMLSelectElement>('#map-propagation-select');
-  const rxAntennaSelect = document.querySelector<HTMLSelectElement>('#map-rx-antenna-select');
-
-  sourceSelect?.addEventListener('change', () => {
-    selectedSourceId = sourceSelect.value;
-  });
-  txAntennaSelect?.addEventListener('change', () => {
-    selectedTxAntennaId = txAntennaSelect.value;
-  });
-  propagationSelect?.addEventListener('change', () => {
-    selectedPropagationModelId = propagationSelect.value;
-  });
-  rxAntennaSelect?.addEventListener('change', () => {
-    selectedRxAntennaId = rxAntennaSelect.value;
-  });
-
   document.querySelector<HTMLButtonElement>('#add-pin-coord')?.addEventListener('click', async () => {
     await addPinFromForm();
   });
@@ -635,20 +623,40 @@ function wireMapEvents(): void {
     });
   });
 
-  document.querySelector<HTMLButtonElement>('#map-calc')?.addEventListener('click', async () => {
+  initMap();
+}
+
+function wireSimulationEvents(): void {
+  const sourceSelect = document.querySelector<HTMLSelectElement>('#sim-source-select');
+  const txAntennaSelect = document.querySelector<HTMLSelectElement>('#sim-tx-antenna-select');
+  const propagationSelect = document.querySelector<HTMLSelectElement>('#sim-propagation-select');
+  const rxAntennaSelect = document.querySelector<HTMLSelectElement>('#sim-rx-antenna-select');
+
+  sourceSelect?.addEventListener('change', () => {
+    selectedSourceId = sourceSelect.value;
+  });
+  txAntennaSelect?.addEventListener('change', () => {
+    selectedTxAntennaId = txAntennaSelect.value;
+  });
+  propagationSelect?.addEventListener('change', () => {
+    selectedPropagationModelId = propagationSelect.value;
+  });
+  rxAntennaSelect?.addEventListener('change', () => {
+    selectedRxAntennaId = rxAntennaSelect.value;
+  });
+
+  document.querySelector<HTMLButtonElement>('#sim-calc')?.addEventListener('click', async () => {
     await runSimulation();
   });
 
-  const txLatInput = document.querySelector<HTMLInputElement>('#tx-lat');
-  const txLonInput = document.querySelector<HTMLInputElement>('#tx-lon');
+  const txLatInput = document.querySelector<HTMLInputElement>('#sim-tx-lat');
+  const txLonInput = document.querySelector<HTMLInputElement>('#sim-tx-lon');
   txLatInput?.addEventListener('change', () => {
     txLatitude = Number.parseFloat(txLatInput.value);
   });
   txLonInput?.addEventListener('change', () => {
     txLongitude = Number.parseFloat(txLonInput.value);
   });
-
-  initMap();
 }
 
 function wireReportsEvents(): void {
@@ -1318,26 +1326,6 @@ function requireAppRoot(): HTMLDivElement {
     throw new Error('App root not found');
   }
   return found;
-}
-
-function readSplashDismissed(): boolean {
-  try {
-    return window.sessionStorage.getItem(SPLASH_SESSION_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function writeSplashDismissed(value: boolean): void {
-  try {
-    if (value) {
-      window.sessionStorage.setItem(SPLASH_SESSION_KEY, '1');
-    } else {
-      window.sessionStorage.removeItem(SPLASH_SESSION_KEY);
-    }
-  } catch {
-    // Ignore storage failures.
-  }
 }
 
 render();

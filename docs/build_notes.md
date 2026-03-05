@@ -133,3 +133,17 @@
 - Known Issues / Next Focus:
   - Optional: replace prompt-based source/sink binding with modal UX.
 - Commit: this commit (`milestone(M10): map ux and theme fixes v0.11.0`)
+
+## M11 - Navigation Reorganization + Licensing Update
+- Date: 2026-03-05
+- Version: 0.12.0
+- Completed:
+  - Reorganized top tabs to: Welcome, Radios, Antennas, Propagation Models, Map View, Simulation, Reports, Preferences, Help.
+  - Converted splash screen into persistent Welcome tab content.
+  - Moved all simulation controls from Map View into a dedicated Simulation tab.
+  - Simplified Map View layout to map + Add Pins panel.
+  - Updated legal notice text to the requested copyright/MIT statement.
+  - Added MIT license file at project root (`LICENSE`).
+- Known Issues / Next Focus:
+  - Optional: align docs language to reflect dedicated Simulation tab workflow.
+- Commit: this commit (`milestone(M11): tabs simulation licensing v0.12.0`)
