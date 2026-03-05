@@ -175,6 +175,9 @@ function renderWelcomeTab(): string {
 }
 
 function renderMapTab(): string {
+  const sourceOptions = workspace.sources
+    .map((source) => `<option value="${source.id}" ${source.id === selectedSourceId ? 'selected' : ''}>${escapeHtml(source.name)}</option>`)
+    .join('');
   const antennaOptions = workspace.antennas
     .map((antenna) => `<option value="${antenna.id}" ${antenna.id === selectedTxAntennaId ? 'selected' : ''}>${escapeHtml(antenna.name)}</option>`)
     .join('');
@@ -217,19 +220,32 @@ function renderMapTab(): string {
           </label>
         </fieldset>
         <label>Pin Name<input id="pin-name" placeholder="Sink name" /></label>
-        <label>Bind Sink Radio
+        ${
+          clickBindMode === 'source'
+            ? `
+        <label>Bind TX Source Radio
+          <select id="pin-source-select">${sourceOptions || '<option value="">No source radio available</option>'}</select>
+        </label>
+        <label>Bind TX Antenna
+          <select id="pin-source-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
+        </label>
+        `
+            : `
+        <label>Bind RX Sink Radio
           <select id="pin-sink-select">${sinkOptions || '<option value="">No sink radio available</option>'}</select>
         </label>
-        <label>Bind Sink Antenna
+        <label>Bind RX Sink Antenna
           <select id="pin-antenna-select">${antennaOptions || '<option value="">No antenna available</option>'}</select>
         </label>
+        `
+        }
         <label>Latitude<input id="pin-lat" type="number" step="0.000001" /></label>
         <label>Longitude<input id="pin-lon" type="number" step="0.000001" /></label>
-        <button id="add-pin-coord">Add Pin (Coordinates)</button>
+        <button id="add-pin-coord">${clickBindMode === 'source' ? 'Set TX Source (Coordinates)' : 'Add Pin (Coordinates)'}</button>
         <label>Address Search
           <input id="geocode-input" placeholder="Address" />
         </label>
-        <button id="add-pin-address">Geocode + Add Pin</button>
+        <button id="add-pin-address">${clickBindMode === 'source' ? 'Geocode + Set TX Source' : 'Geocode + Add Pin'}</button>
         <div class="action-row">
           <button id="export-kml">Export KML</button>
           <label class="import-label">Import KML<input id="import-kml" type="file" accept=".kml,application/vnd.google-earth.kml+xml" /></label>
@@ -596,8 +612,19 @@ function wireMapEvents(): void {
     input.addEventListener('change', () => {
       if (input.checked) {
         clickBindMode = input.value as ClickBindMode;
+        render();
       }
     });
+  });
+
+  const sourceBindSelect = document.querySelector<HTMLSelectElement>('#pin-source-select');
+  sourceBindSelect?.addEventListener('change', () => {
+    selectedSourceId = sourceBindSelect.value;
+  });
+
+  const sourceAntennaBindSelect = document.querySelector<HTMLSelectElement>('#pin-source-antenna-select');
+  sourceAntennaBindSelect?.addEventListener('change', () => {
+    selectedTxAntennaId = sourceAntennaBindSelect.value;
   });
 
   document.querySelector<HTMLButtonElement>('#add-pin-coord')?.addEventListener('click', async () => {
@@ -787,6 +814,36 @@ async function runSimulation(): Promise<void> {
 }
 
 async function addPinFromForm(): Promise<void> {
+  if (clickBindMode === 'source') {
+    const latInput = document.querySelector<HTMLInputElement>('#pin-lat');
+    const lonInput = document.querySelector<HTMLInputElement>('#pin-lon');
+    const sourceSelect = document.querySelector<HTMLSelectElement>('#pin-source-select');
+    const antennaSelect = document.querySelector<HTMLSelectElement>('#pin-source-antenna-select');
+
+    const lat = Number.parseFloat(latInput?.value ?? '');
+    const lon = Number.parseFloat(lonInput?.value ?? '');
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      alert('Provide valid latitude and longitude.');
+      return;
+    }
+
+    if (!sourceSelect?.value) {
+      alert('Select a TX source radio.');
+      return;
+    }
+    if (!antennaSelect?.value) {
+      alert('Select a TX antenna.');
+      return;
+    }
+
+    selectedSourceId = sourceSelect.value;
+    selectedTxAntennaId = antennaSelect.value;
+    txLatitude = lat;
+    txLongitude = lon;
+    render();
+    return;
+  }
+
   const nameInput = document.querySelector<HTMLInputElement>('#pin-name');
   const sinkSelect = document.querySelector<HTMLSelectElement>('#pin-sink-select');
   const antennaSelect = document.querySelector<HTMLSelectElement>('#pin-antenna-select');
@@ -887,6 +944,7 @@ function initMap(): void {
     if (clickBindMode === 'source') {
       txLatitude = lat;
       txLongitude = lon;
+      render();
       return;
     }
     void addPinFromClick(lat, lon);

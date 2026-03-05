@@ -198,3 +198,16 @@
 - Known Issues / Next Focus:
   - Optional: add inline validation ranges/tooltips for each radios parameter.
 - Commit: this commit (`milestone(M15): radios labels and khz bandwidth v0.16.0`)
+
+## M16 - Map Click Mode Panel Binding Fix
+- Date: 2026-03-05
+- Version: 0.17.0
+- Completed:
+  - Fixed Map View click mode panel so switching between TX source and RX sink reconfigures relevant entry fields.
+  - Added TX source/antenna binding controls when "Set TX Source" mode is selected.
+  - Kept RX sink radio/antenna controls when "Add RX Sink" mode is selected.
+  - Updated coordinate action button labels to match selected mode.
+  - Ensured map click in TX mode updates TX coordinates and re-renders immediately.
+- Known Issues / Next Focus:
+  - Optional: hide pin-name field in TX mode to reduce clutter.
+- Commit: this commit (`milestone(M16): map click mode panel binding fix v0.17.0`)
