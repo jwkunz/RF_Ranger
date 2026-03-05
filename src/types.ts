@@ -82,8 +82,11 @@ export interface MapPin {
 
 export interface SimulationResultRow {
   sinkPinId: string;
+  sourceName: string;
   sinkName: string;
+  transmitterEirpDbm: number;
   distanceKm: number;
+  propagationLossesDb: number;
   incidentRfPowerDbm: number;
   incidentElectricFieldVm: number;
   availablePowerAtAntennaDbm: number;

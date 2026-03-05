@@ -308,8 +308,11 @@ function renderReportsTab(): string {
     .map((row) => {
       const highlighted = row.sinkPinId === focusedReportPinId ? ' class="focus-row"' : '';
       return `<tr${highlighted}>
+        <td>${escapeHtml(row.sourceName)}</td>
         <td>${escapeHtml(row.sinkName)}</td>
+        <td>${formatPower(row.transmitterEirpDbm)}</td>
         <td>${formatDistance(row.distanceKm)}</td>
+        <td>${row.propagationLossesDb.toFixed(2)} dB</td>
         <td>${formatPower(row.incidentRfPowerDbm)}</td>
         <td>${row.incidentElectricFieldVm.toExponential(3)} V/m</td>
         <td>${formatPower(row.availablePowerAtAntennaDbm)}</td>
@@ -330,18 +333,21 @@ function renderReportsTab(): string {
       <table>
         <thead>
           <tr>
+            <th>Source</th>
             <th>Sink</th>
+            <th>Transmitter EIRP</th>
             <th>Distance</th>
+            <th>Propagation Losses</th>
             <th>Incident RF Power</th>
             <th>Incident Electric Field</th>
             <th>Available Power at Antenna</th>
-            <th>SNR</th>
+            <th>SNR in Receiver</th>
             <th>Useable Link</th>
             <th>Warnings</th>
             <th>Jump</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="9">No report data. Run Calculate in Map View.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="11">No report data. Run Calculate in Map View.</td></tr>'}</tbody>
       </table>
     </section>
   `;

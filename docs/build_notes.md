@@ -239,3 +239,17 @@
 - Known Issues / Next Focus:
   - Optional: persist pane sub-tab and pane widths in workspace preferences.
 - Commit: this commit (`milestone(M18): add-pins pane source/sink refactor v0.19.0`)
+
+## M19 - Report Column Expansion and Source Labeling
+- Date: 2026-03-05
+- Version: 0.20.0
+- Completed:
+  - Added `Source` label column adjacent to `Sink` in Reports.
+  - Added `Transmitter EIRP` report field and column.
+  - Added `Propagation Losses` report field and column.
+  - Reordered report columns to: Source, Sink, Transmitter EIRP, Distance, Propagation Losses, then existing downstream fields.
+  - Renamed report column label from `SNR` to `SNR in Receiver`.
+  - Updated CSV export to match the new report column schema and order.
+- Known Issues / Next Focus:
+  - Optional: add unit toggles for propagation loss display precision.
+- Commit: this commit (`milestone(M19): report eirp/loss/source updates v0.20.0`)

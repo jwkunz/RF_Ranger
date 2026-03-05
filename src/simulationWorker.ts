@@ -44,8 +44,9 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
       const baseFsplDb = 20 * Math.log10(Math.max(distanceKm, 0.001)) + 20 * Math.log10(Math.max(frequencyMHz, 0.001)) + 32.44;
       const extraLossDb = modelLossAdjustmentDb(input.propagationModel, distanceKm, frequencyMHz);
       const totalPathLossDb = baseFsplDb + extraLossDb;
+      const transmitterEirpDbm = input.source.txPowerDbm + txGain;
 
-      const incidentRfPowerDbm = input.source.txPowerDbm + txGain - totalPathLossDb;
+      const incidentRfPowerDbm = transmitterEirpDbm - totalPathLossDb;
       const availablePowerAtAntennaDbm = incidentRfPowerDbm + rxGain;
 
       const noiseFloorDbm = thermalNoiseDbm(
@@ -70,8 +71,11 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
 
       rows.push({
         sinkPinId: sinkDef.pin.id,
+        sourceName: input.source.name,
         sinkName: sinkDef.pin.name,
+        transmitterEirpDbm,
         distanceKm,
+        propagationLossesDb: totalPathLossDb,
         incidentRfPowerDbm,
         incidentElectricFieldVm,
         availablePowerAtAntennaDbm,

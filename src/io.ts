@@ -79,18 +79,24 @@ export async function parsePinsKml(file: File): Promise<MapPin[]> {
 
 export function exportReportsCsv(rows: SimulationResultRow[]): void {
   const header = [
+    'Source Name',
     'Sink Name',
+    'Transmitter EIRP',
     'Distance',
+    'Propagation Losses',
     'Incident RF Power',
     'Incident Electric Field',
     'Available Power at Antenna',
-    'Signal to Noise Ratio In Radio',
+    'SNR in Receiver',
     'Useable Link'
   ];
   const lines = rows.map((row) =>
     [
+      row.sourceName,
       row.sinkName,
+      row.transmitterEirpDbm.toString(),
       row.distanceKm.toString(),
+      row.propagationLossesDb.toString(),
       row.incidentRfPowerDbm.toString(),
       row.incidentElectricFieldVm.toString(),
       row.availablePowerAtAntennaDbm.toString(),
