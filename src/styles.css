@@ -208,6 +208,20 @@ fieldset.param-grid {
   overflow: auto;
 }
 
+.click-mode {
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.inline-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .map-panel {
   min-height: 72vh;
 }

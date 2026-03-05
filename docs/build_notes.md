@@ -147,3 +147,18 @@
 - Known Issues / Next Focus:
   - Optional: align docs language to reflect dedicated Simulation tab workflow.
 - Commit: this commit (`milestone(M11): tabs simulation licensing v0.12.0`)
+
+## M12 - Sink Noise Model Simplification + Click Mode Controls
+- Date: 2026-03-05
+- Version: 0.13.0
+- Completed:
+  - Replaced typed click prompt with radio-button click mode selection in Map View (source vs sink).
+  - Updated map click behavior to use selected click mode directly.
+  - Refactored sink model to remove sensitivity/manual-noise-floor confusion.
+  - Sink definition now uses Environment Noise Temperature (K), Noise Figure (dB), and Required SNR (dB).
+  - Removed global SNR threshold from Preferences.
+  - Updated simulation math to compute thermal noise and per-sink signal threshold from sink parameters.
+  - Added workspace normalization so older saved data gets compatible default sink fields.
+- Known Issues / Next Focus:
+  - Optional: add explicit threshold column in Reports for easier user interpretation.
+- Commit: this commit (`milestone(M12): sink noise model + click mode controls v0.13.0`)

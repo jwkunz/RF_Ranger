@@ -44,11 +44,11 @@ export interface RadioSource {
 export interface RadioSink {
   id: string;
   name: string;
-  receiverSensitivityDbm: number;
   carrierFrequencyMHz: number;
   bandwidthHz: number;
+  environmentNoiseTemperatureK: number;
   noiseFigureDb: number;
-  manualNoiseFloorDbm?: number;
+  requiredSnrDb: number;
 }
 
 export interface AntennaModel {
@@ -94,7 +94,6 @@ export interface Preferences {
   theme: ThemeMode;
   powerUnit: PowerUnit;
   distanceUnit: DistanceUnit;
-  snrThresholdDb: number;
 }
 
 export interface WorkspaceSnapshot {

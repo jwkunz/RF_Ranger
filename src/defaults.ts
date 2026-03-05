@@ -10,8 +10,7 @@ export const DEFAULT_WORKSPACE: WorkspaceSnapshot = {
   preferences: {
     theme: 'dark',
     powerUnit: 'dBm',
-    distanceUnit: 'km',
-    snrThresholdDb: 10
+    distanceUnit: 'km'
   },
   reportLatest: []
 };

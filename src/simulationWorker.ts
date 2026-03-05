@@ -8,7 +8,6 @@ interface SimulationInput {
   sinks: Array<{ pin: MapPin; sink: RadioSink; sinkAntenna: AntennaModel | null }>;
   txLatitude: number;
   txLongitude: number;
-  snrThresholdDb: number;
 }
 
 interface ProgressMessage {
@@ -49,12 +48,15 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
       const incidentRfPowerDbm = input.source.txPowerDbm + txGain - totalPathLossDb;
       const availablePowerAtAntennaDbm = incidentRfPowerDbm + rxGain;
 
-      const noiseFloorDbm =
-        sinkDef.sink.manualNoiseFloorDbm ?? (-174 + 10 * Math.log10(Math.max(sinkDef.sink.bandwidthHz, 1)) + sinkDef.sink.noiseFigureDb);
+      const noiseFloorDbm = thermalNoiseDbm(
+        sinkDef.sink.environmentNoiseTemperatureK ?? 300,
+        sinkDef.sink.bandwidthHz,
+        sinkDef.sink.noiseFigureDb ?? 10
+      );
       const snrDb = availablePowerAtAntennaDbm - noiseFloorDbm;
+      const thresholdDbm = noiseFloorDbm + (sinkDef.sink.requiredSnrDb ?? 15);
 
-      const usable =
-        availablePowerAtAntennaDbm >= sinkDef.sink.receiverSensitivityDbm && snrDb >= input.snrThresholdDb ? 'Y' : 'N';
+      const usable = availablePowerAtAntennaDbm >= thresholdDbm ? 'Y' : 'N';
 
       const warnings: string[] = [];
       if (Math.abs(sinkDef.sink.carrierFrequencyMHz - input.source.carrierFrequencyMHz) > 0.001) {
@@ -144,6 +146,12 @@ function modelLossAdjustmentDb(model: PropagationModel, distanceKm: number, freq
 
 function dbmToWatts(dbm: number): number {
   return Math.pow(10, (dbm - 30) / 10);
+}
+
+function thermalNoiseDbm(temperatureK: number, bandwidthHz: number, noiseFigureDb: number): number {
+  const boltzmann = 1.380649e-23;
+  const noiseWatts = boltzmann * Math.max(temperatureK, 1) * Math.max(bandwidthHz, 1);
+  return 10 * Math.log10(noiseWatts * 1000) + noiseFigureDb;
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {

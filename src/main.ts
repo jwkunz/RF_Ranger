@@ -58,7 +58,6 @@ interface SimulationWorkerInput {
   sinks: Array<{ pin: WorkspaceSnapshot['pins'][number]; sink: RadioSink; sinkAntenna: AntennaModel | null }>;
   txLatitude: number;
   txLongitude: number;
-  snrThresholdDb: number;
 }
 
 interface SimulationProgressMessage {
@@ -78,6 +77,7 @@ interface SimulationErrorMessage {
 }
 
 type SimulationWorkerMessage = SimulationProgressMessage | SimulationCompleteMessage | SimulationErrorMessage;
+type ClickBindMode = 'sink' | 'source';
 
 let selectedTab: TabId = 'welcome';
 let workspace: WorkspaceSnapshot = structuredClone(DEFAULT_WORKSPACE);
@@ -90,6 +90,7 @@ let selectedPropagationModelId = '';
 let selectedRxAntennaId = '';
 let txLatitude = 39.8283;
 let txLongitude = -98.5795;
+let clickBindMode: ClickBindMode = 'sink';
 let progress: ProgressState = { running: false, completed: 0, total: 0, message: 'Idle' };
 let focusedReportPinId = '';
 
@@ -99,6 +100,7 @@ void init();
 
 async function init(): Promise<void> {
   workspace = await loadWorkspace();
+  workspace = normalizeWorkspace(workspace);
   selectedSourceId = workspace.sources[0]?.id ?? '';
   selectedTxAntennaId = workspace.antennas[0]?.id ?? '';
   selectedPropagationModelId = workspace.propagationModels[0]?.id ?? '';
@@ -201,6 +203,17 @@ function renderMapTab(): string {
       </section>
       <aside class="panel stack map-controls map-controls--right">
         <h3>Add Pins</h3>
+        <fieldset class="click-mode">
+          <legend>Map Click Mode</legend>
+          <label class="inline-radio">
+            <input type="radio" name="click-bind-mode" value="sink" ${clickBindMode === 'sink' ? 'checked' : ''} />
+            Add Sink Pin
+          </label>
+          <label class="inline-radio">
+            <input type="radio" name="click-bind-mode" value="source" ${clickBindMode === 'source' ? 'checked' : ''} />
+            Set TX Source
+          </label>
+        </fieldset>
         <label>Pin Name<input id="pin-name" placeholder="Sink name" /></label>
         <label>Bind Sink Radio
           <select id="pin-sink-select">${sinkOptions || '<option value="">No sink radio available</option>'}</select>
@@ -352,11 +365,11 @@ function renderRadiosTab(): string {
       (sink) => `
       <tr>
         <td>${escapeHtml(sink.name)}</td>
-        <td>${sink.receiverSensitivityDbm}</td>
         <td>${sink.carrierFrequencyMHz}</td>
         <td>${sink.bandwidthHz}</td>
+        <td>${sink.environmentNoiseTemperatureK}</td>
         <td>${sink.noiseFigureDb}</td>
-        <td>${sink.manualNoiseFloorDbm ?? 'auto'}</td>
+        <td>${sink.requiredSnrDb}</td>
         <td><button data-edit-sink="${sink.id}">Edit</button> <button data-delete-sink="${sink.id}">Delete</button></td>
       </tr>`
     )
@@ -386,18 +399,18 @@ function renderRadiosTab(): string {
       <h3>Add Sink</h3>
       <form id="add-sink-form" class="grid-form">
         <input name="name" placeholder="Name" required />
-        <input name="receiverSensitivityDbm" type="number" step="0.1" placeholder="Receiver Sensitivity (dBm)" required />
         <input name="carrierFrequencyMHz" type="number" step="0.001" placeholder="Carrier Frequency (MHz)" required />
         <input name="bandwidthHz" type="number" step="1" placeholder="Bandwidth (Hz)" required />
-        <input name="noiseFigureDb" type="number" step="0.1" placeholder="Noise Figure (dB)" required />
-        <input name="manualNoiseFloorDbm" type="number" step="0.1" placeholder="Manual Noise Floor (optional)" />
+        <input name="environmentNoiseTemperatureK" type="number" step="1" value="300" placeholder="Environment Noise Temp (K)" required />
+        <input name="noiseFigureDb" type="number" step="0.1" value="10" placeholder="Noise Figure (dB)" required />
+        <input name="requiredSnrDb" type="number" step="0.1" value="15" placeholder="Required SNR (dB)" required />
         <button class="primary-btn" type="submit">Add Sink</button>
       </form>
     </section>
     <section class="panel">
       <h3>Sinks</h3>
       <table>
-        <thead><tr><th>Name</th><th>Sensitivity</th><th>Freq (MHz)</th><th>BW (Hz)</th><th>NF (dB)</th><th>Noise Floor</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Freq (MHz)</th><th>BW (Hz)</th><th>Env Temp (K)</th><th>NF (dB)</th><th>Req SNR (dB)</th><th>Actions</th></tr></thead>
         <tbody>${sinkRows || '<tr><td colspan="7">No sinks yet.</td></tr>'}</tbody>
       </table>
     </section>
@@ -530,9 +543,6 @@ function renderPreferencesTab(): string {
           <option value="feet" ${workspace.preferences.distanceUnit === 'feet' ? 'selected' : ''}>feet</option>
         </select>
       </label>
-      <label>SNR Threshold (dB)
-        <input id="pref-snr" type="number" value="${workspace.preferences.snrThresholdDb}" step="0.1" />
-      </label>
       <div class="action-row">
         <button id="export-json" class="primary-btn">Export Workspace JSON</button>
         <label class="import-label">Import Workspace JSON<input id="import-json" type="file" accept="application/json,.json" /></label>
@@ -566,6 +576,14 @@ function wireTabEvents(): void {
 }
 
 function wireMapEvents(): void {
+  document.querySelectorAll<HTMLInputElement>('input[name="click-bind-mode"]').forEach((input) => {
+    input.addEventListener('change', () => {
+      if (input.checked) {
+        clickBindMode = input.value as ClickBindMode;
+      }
+    });
+  });
+
   document.querySelector<HTMLButtonElement>('#add-pin-coord')?.addEventListener('click', async () => {
     await addPinFromForm();
   });
@@ -716,8 +734,7 @@ async function runSimulation(): Promise<void> {
     propagationModel,
     sinks,
     txLatitude,
-    txLongitude,
-    snrThresholdDb: workspace.preferences.snrThresholdDb
+    txLongitude
   };
 
   worker.onmessage = async (event: MessageEvent<SimulationWorkerMessage>) => {
@@ -787,57 +804,25 @@ async function addPinFromForm(): Promise<void> {
   render();
 }
 
-async function promptPinBindingFromMapClick(lat: number, lon: number): Promise<void> {
-  const bindingRaw = prompt("Bind clicked location as 'source' or 'sink' (leave blank to cancel):", 'sink');
-  if (!bindingRaw) {
-    return;
-  }
+async function addPinFromClick(lat: number, lon: number): Promise<void> {
+  const nameInput = document.querySelector<HTMLInputElement>('#pin-name');
+  const sinkSelect = document.querySelector<HTMLSelectElement>('#pin-sink-select');
+  const antennaSelect = document.querySelector<HTMLSelectElement>('#pin-antenna-select');
 
-  const binding = bindingRaw.trim().toLowerCase();
-  if (binding === 'source') {
-    txLatitude = lat;
-    txLongitude = lon;
-    render();
-    return;
-  }
-
-  if (binding !== 'sink') {
-    alert("Invalid selection. Enter either 'source' or 'sink'.");
-    return;
-  }
-
-  if (!workspace.sinks.length || !workspace.antennas.length) {
-    alert('Create at least one sink radio and one antenna before adding sink pins from map clicks.');
-    return;
-  }
-
-  const sinkIndex = prompt(
-    `Select sink radio number:\\n${workspace.sinks.map((sink, i) => `${i + 1}) ${sink.name}`).join('\\n')}`,
-    '1'
-  );
-  const sinkIdx = Number.parseInt(sinkIndex ?? '', 10) - 1;
-  if (!Number.isInteger(sinkIdx) || sinkIdx < 0 || sinkIdx >= workspace.sinks.length) {
-    alert('Invalid sink selection.');
-    return;
-  }
-
-  const antennaIndex = prompt(
-    `Select sink antenna number:\\n${workspace.antennas.map((antenna, i) => `${i + 1}) ${antenna.name}`).join('\\n')}`,
-    '1'
-  );
-  const antennaIdx = Number.parseInt(antennaIndex ?? '', 10) - 1;
-  if (!Number.isInteger(antennaIdx) || antennaIdx < 0 || antennaIdx >= workspace.antennas.length) {
-    alert('Invalid antenna selection.');
+  const sinkRadioId = sinkSelect?.value || '';
+  const sinkAntennaId = antennaSelect?.value || '';
+  if (!sinkRadioId || !sinkAntennaId) {
+    alert('Select sink radio and sink antenna before adding sink pins from map clicks.');
     return;
   }
 
   workspace.pins.push({
     id: uid(),
-    name: `Sink ${workspace.pins.length + 1}`,
+    name: nameInput?.value.trim() || `Sink ${workspace.pins.length + 1}`,
     latitude: lat,
     longitude: lon,
-    sinkRadioId: workspace.sinks[sinkIdx].id,
-    sinkAntennaId: workspace.antennas[antennaIdx].id
+    sinkRadioId,
+    sinkAntennaId
   });
 
   await saveWorkspace(workspace);
@@ -883,7 +868,12 @@ function initMap(): void {
       latInput.value = String(lat);
       lonInput.value = String(lon);
     }
-    void promptPinBindingFromMapClick(lat, lon);
+    if (clickBindMode === 'source') {
+      txLatitude = lat;
+      txLongitude = lon;
+      return;
+    }
+    void addPinFromClick(lat, lon);
   });
 
   for (const marker of mapMarkers) {
@@ -954,15 +944,14 @@ function wireRadiosEvents(): void {
   sinkForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(sinkForm);
-    const manualNoiseFloor = String(data.get('manualNoiseFloorDbm') ?? '').trim();
     const sink: RadioSink = {
       id: uid(),
       name: String(data.get('name') ?? ''),
-      receiverSensitivityDbm: toNumber(data.get('receiverSensitivityDbm')),
       carrierFrequencyMHz: toNumber(data.get('carrierFrequencyMHz')),
       bandwidthHz: toNumber(data.get('bandwidthHz')),
-      noiseFigureDb: toNumber(data.get('noiseFigureDb')),
-      manualNoiseFloorDbm: manualNoiseFloor ? Number.parseFloat(manualNoiseFloor) : undefined
+      environmentNoiseTemperatureK: toNumber(data.get('environmentNoiseTemperatureK') ?? '300') || 300,
+      noiseFigureDb: toNumber(data.get('noiseFigureDb') ?? '10') || 10,
+      requiredSnrDb: toNumber(data.get('requiredSnrDb') ?? '15') || 15
     };
     workspace.sinks.push(sink);
     await saveWorkspace(workspace);
@@ -1141,7 +1130,6 @@ function wirePreferencesEvents(): void {
   const theme = document.querySelector<HTMLSelectElement>('#pref-theme');
   const powerUnit = document.querySelector<HTMLSelectElement>('#pref-power-unit');
   const distanceUnit = document.querySelector<HTMLSelectElement>('#pref-distance-unit');
-  const snr = document.querySelector<HTMLInputElement>('#pref-snr');
   const exportButton = document.querySelector<HTMLButtonElement>('#export-json');
   const importInput = document.querySelector<HTMLInputElement>('#import-json');
 
@@ -1161,14 +1149,6 @@ function wirePreferencesEvents(): void {
     await saveWorkspace(workspace);
   });
 
-  snr?.addEventListener('change', async () => {
-    const value = Number.parseFloat(snr.value);
-    if (Number.isFinite(value)) {
-      workspace.preferences.snrThresholdDb = value;
-      await saveWorkspace(workspace);
-    }
-  });
-
   exportButton?.addEventListener('click', () => {
     exportWorkspaceJson(workspace);
   });
@@ -1179,7 +1159,7 @@ function wirePreferencesEvents(): void {
       return;
     }
     try {
-      workspace = await parseWorkspaceJson(file);
+      workspace = normalizeWorkspace(await parseWorkspaceJson(file));
       await saveWorkspace(workspace);
       applyTheme();
       render();
@@ -1187,6 +1167,27 @@ function wirePreferencesEvents(): void {
       alert(`Import failed: ${String(error)}`);
     }
   });
+}
+
+function normalizeWorkspace(work: WorkspaceSnapshot): WorkspaceSnapshot {
+  const preferences = {
+    theme: work.preferences?.theme ?? DEFAULT_WORKSPACE.preferences.theme,
+    powerUnit: work.preferences?.powerUnit ?? DEFAULT_WORKSPACE.preferences.powerUnit,
+    distanceUnit: work.preferences?.distanceUnit ?? DEFAULT_WORKSPACE.preferences.distanceUnit
+  };
+
+  const sinks = work.sinks.map((sink) => ({
+    ...sink,
+    environmentNoiseTemperatureK: sink.environmentNoiseTemperatureK ?? 300,
+    noiseFigureDb: sink.noiseFigureDb ?? 10,
+    requiredSnrDb: sink.requiredSnrDb ?? 15
+  }));
+
+  return {
+    ...work,
+    preferences,
+    sinks
+  };
 }
 
 function applyTheme(): void {
