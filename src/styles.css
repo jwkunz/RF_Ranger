@@ -7,6 +7,18 @@
   --tab: #dde4ea;
   --tab-active: #1f6feb;
   --tab-active-fg: #ffffff;
+  --muted: #475569;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --fg: #e2e8f0;
+  --panel: #1e293b;
+  --tab: #334155;
+  --tab-active: #0284c7;
+  --tab-active-fg: #ecfeff;
+  --muted: #94a3b8;
 }
 
 * {
@@ -17,6 +29,10 @@ body {
   margin: 0;
   background: radial-gradient(circle at top left, #e3edf7 0%, var(--bg) 45%);
   color: var(--fg);
+}
+
+:root[data-theme="dark"] body {
+  background: radial-gradient(circle at top left, #1e293b 0%, var(--bg) 45%);
 }
 
 .splash {
@@ -43,15 +59,15 @@ body {
 
 .splash__subtitle {
   margin-bottom: 1rem;
-  color: #334155;
+  color: var(--muted);
 }
 
 .splash__legal {
   text-align: left;
   margin-top: 1.5rem;
   font-size: 0.86rem;
-  color: #475569;
-  border-top: 1px solid #d5dce3;
+  color: var(--muted);
+  border-top: 1px solid #64748b;
   padding-top: 1rem;
 }
 
@@ -77,6 +93,10 @@ body {
   overflow-x: auto;
 }
 
+:root[data-theme="dark"] .tabs {
+  background: #0b1220;
+}
+
 .tab-btn {
   border: 0;
   border-radius: 8px;
@@ -95,4 +115,47 @@ body {
 
 .tab-content {
   padding: 1.2rem;
+}
+
+.stack {
+  max-width: 560px;
+  display: grid;
+  gap: 0.8rem;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.import-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
 }

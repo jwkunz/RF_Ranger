@@ -22,3 +22,15 @@
   - Implement domain models, persistence, and import/export.
   - Tooling validation pending because Node/npm is unavailable in current environment.
 - Commit: this commit (`milestone(M1): app shell splash tabs v0.2.0`)
+
+## M2 - Domain Types + Persistence + Import/Export Core
+- Date: 2026-03-05
+- Version: 0.3.0
+- Completed:
+  - Added typed core domain models and workspace schema.
+  - Implemented IndexedDB load/save for persistent workspace state.
+  - Added preferences persistence baseline.
+  - Added workspace JSON export/import actions in Preferences.
+- Known Issues / Next Focus:
+  - Add full CRUD UI for radios, antennas, and propagation models.
+- Commit: this commit (`milestone(M2): domain persistence io core v0.3.0`)
