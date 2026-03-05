@@ -108,3 +108,14 @@
 - Known Issues / Next Focus:
   - Optional: refine simulation model fidelity and add automated tests.
 - Commit: this commit (`milestone(M8): toolchain hardening single-file v0.9.0`)
+
+## M9 - Release Script Validation
+- Date: 2026-03-05
+- Version: 0.10.0
+- Completed:
+  - Executed `scripts/build-release.sh 0.9.0` successfully.
+  - Verified single-file web build output and zipped release artifact generation.
+  - Confirmed artifact path: `build/rf-ranger-v0.9.0.zip`.
+- Known Issues / Next Focus:
+  - Optional: run tag-driven GitHub release workflow on remote.
+- Commit: this commit (`milestone(M9): release script validation v0.10.0`)
