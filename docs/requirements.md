@@ -13,6 +13,7 @@ RF Ranger is a browser-based RF experimentation planning tool for modeling radio
   - Sites
   - Simulation
   - Results
+  - Report
   - Preferences
   - Help
   - Legal
@@ -30,12 +31,14 @@ RF Ranger is a browser-based RF experimentation planning tool for modeling radio
   - Add each definition to a simulation queue.
   - Launch all queued simulations as a batch.
 - Results tab shows buffered simulation queue runs; user can remove individual runs or clear all.
+- Report tab generates downloadable PDF reports from selected result run data.
 
 ## Persistence and Data Exchange
 - Persistent browser storage via IndexedDB.
 - Full workspace JSON export/import.
 - KML import/export for sites.
 - CSV export for selected result run.
+- PDF report generation with user-selectable sections and result fields.
 
 ## Simulation Rules
 - Simulations are queued and executed in batch.

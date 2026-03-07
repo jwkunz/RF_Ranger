@@ -9,6 +9,7 @@ import modelsMarkdown from '../docs/Models.md?raw';
 import MarkdownIt from 'markdown-it';
 import texmath from 'markdown-it-texmath';
 import katex from 'katex';
+import { jsPDF } from 'jspdf';
 import { DEFAULT_WORKSPACE } from './defaults';
 import { exportReportsCsv, exportSitesKml, exportWorkspaceJson, parseSitesKml, parseWorkspaceJson } from './io';
 import { loadWorkspace, saveWorkspace } from './storage';
@@ -36,6 +37,7 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'sites', label: 'Sites' },
   { id: 'simulation', label: 'Simulation' },
   { id: 'reports', label: 'Results' },
+  { id: 'report', label: 'Report' },
   { id: 'preferences', label: 'Preferences' },
   { id: 'help', label: 'Help' },
   { id: 'legal', label: 'Legal' }
@@ -124,6 +126,27 @@ const modelGuideMarkdown = new MarkdownIt({ html: false, linkify: true, typograp
   katexOptions: { throwOnError: false, strict: 'ignore' }
 });
 
+const RESULT_FIELD_OPTIONS: Array<{ id: string; label: string; value: (row: SimulationResultRow) => string }> = [
+  { id: 'transmitterSiteName', label: 'Transmitter Site Name', value: (row) => row.transmitterSiteName },
+  { id: 'transmitterCoordinates', label: 'Transmitter Coordinates', value: (row) => row.transmitterCoordinates },
+  { id: 'transmitterRadio', label: 'Transmitter Radio', value: (row) => row.transmitterRadio },
+  { id: 'frequencyMHz', label: 'Frequency (MHz)', value: (row) => row.frequencyMHz.toFixed(3) },
+  { id: 'bandwidthKHz', label: 'Bandwidth (kHz)', value: (row) => row.bandwidthKHz.toFixed(3) },
+  { id: 'receiverSiteName', label: 'Receiver Site Name', value: (row) => row.receiverSiteName },
+  { id: 'receiverCoordinates', label: 'Receiver Coordinates', value: (row) => row.receiverCoordinates },
+  { id: 'receiverRadio', label: 'Receiver Radio', value: (row) => row.receiverRadio },
+  { id: 'transmitterEirpDensity', label: 'Transmitter EIRP Density', value: (row) => row.transmitterEirpDensityDbmPerHz.toFixed(2) },
+  { id: 'distance', label: 'Distance', value: (row) => formatDistance(row.distanceKm) },
+  { id: 'propagationLosses', label: 'Propagation Losses', value: (row) => `${row.propagationLossesDb.toFixed(2)} dB` },
+  { id: 'incidentRfDensity', label: 'Incident RF Power Density', value: (row) => formatPowerDensity(row.incidentRfPowerDensityDbmPerHz) },
+  { id: 'incidentField', label: 'Incident Electric Field', value: (row) => `${row.incidentElectricFieldVm.toExponential(3)} V/m` },
+  { id: 'signalPower', label: 'Signal Power Into Receiver', value: (row) => formatPowerDensity(row.availablePowerDensityAtAntennaDbmPerHz) },
+  { id: 'receiverNoiseFloor', label: 'Receiver Noise Floor', value: (row) => formatPowerDensity(row.receiverNoiseFloorDensityDbmPerHz) },
+  { id: 'snr', label: 'SNR in Receiver', value: (row) => `${row.snrDb.toFixed(2)} dB` },
+  { id: 'usableLink', label: 'Useable Link', value: (row) => row.usableLink },
+  { id: 'warnings', label: 'Warnings', value: (row) => row.warnings.join('; ') || 'None' }
+];
+
 interface ProgressState {
   running: boolean;
   completed: number;
@@ -181,6 +204,13 @@ let sitePaneWidthPx: number | null = null;
 let progress: ProgressState = { running: false, completed: 0, total: 0, message: 'Idle' };
 let focusedReportQueueItemId = '';
 let selectedResultRunId = '';
+let reportIncludeMap = true;
+let reportIncludeTxRadio = true;
+let reportIncludeTxAntenna = true;
+let reportIncludePropagationModel = true;
+let reportIncludeRxAntenna = true;
+let reportIncludeRxRadio = true;
+let selectedReportFieldIds = new Set<string>(RESULT_FIELD_OPTIONS.map((entry) => entry.id));
 
 const app = requireAppRoot();
 
@@ -235,6 +265,8 @@ function renderTabContent(tabId: TabId): string {
       return renderPropagationTab();
     case 'reports':
       return renderReportsTab();
+    case 'report':
+      return renderReportBuilderTab();
     case 'preferences':
       return renderPreferencesTab();
     case 'help':
@@ -494,6 +526,46 @@ function renderReportsTab(): string {
         <thead><tr><th>#</th><th>Run Time</th><th>Rows</th><th>Actions</th></tr></thead>
         <tbody>${runRows || '<tr><td colspan="4">No buffered results yet.</td></tr>'}</tbody>
       </table>
+    </section>
+  `;
+}
+
+function renderReportBuilderTab(): string {
+  const activeRun = workspace.reportHistory.find((run) => run.id === selectedResultRunId) ?? workspace.reportHistory[0] ?? null;
+  const runOptions = workspace.reportHistory
+    .map((run, index) => {
+      const stamp = new Date(run.createdAtIso).toLocaleString();
+      return `<option value="${run.id}" ${run.id === activeRun?.id ? 'selected' : ''}>Run ${index + 1} - ${escapeHtml(stamp)} (${run.rows.length} rows)</option>`;
+    })
+    .join('');
+
+  const resultFieldChecks = RESULT_FIELD_OPTIONS.map((field) => {
+    const checked = selectedReportFieldIds.has(field.id) ? 'checked' : '';
+    return `<label class="inline-check"><input type="checkbox" data-report-field="${field.id}" ${checked}/> ${escapeHtml(field.label)}</label>`;
+  }).join('');
+
+  return `
+    <h2>Report</h2>
+    <section class="panel stack">
+      <label>Result Run
+        <select id="report-run-select">${runOptions || '<option value="">No results available</option>'}</select>
+      </label>
+      <label class="inline-check"><input id="report-include-map" type="checkbox" ${reportIncludeMap ? 'checked' : ''}/> Include current map view render</label>
+      <label class="inline-check"><input id="report-include-tx-radio" type="checkbox" ${reportIncludeTxRadio ? 'checked' : ''}/> Include TX Radio Information</label>
+      <label class="inline-check"><input id="report-include-tx-antenna" type="checkbox" ${reportIncludeTxAntenna ? 'checked' : ''}/> Include TX Antenna Information</label>
+      <label class="inline-check"><input id="report-include-propagation" type="checkbox" ${reportIncludePropagationModel ? 'checked' : ''}/> Include Propagation Model Information</label>
+      <label class="inline-check"><input id="report-include-rx-antenna" type="checkbox" ${reportIncludeRxAntenna ? 'checked' : ''}/> Include RX Antenna Information</label>
+      <label class="inline-check"><input id="report-include-rx-radio" type="checkbox" ${reportIncludeRxRadio ? 'checked' : ''}/> Include RX Radio Information</label>
+      <fieldset class="param-grid">
+        <legend>Simulation Result Fields</legend>
+        ${resultFieldChecks}
+      </fieldset>
+      <div class="action-row">
+        <button id="report-select-all-fields">Select All Fields</button>
+        <button id="report-clear-fields">Clear Fields</button>
+        <button id="generate-pdf" class="primary-btn">Generate PDF</button>
+      </div>
+      <p class="muted">Sections are rendered sequentially in the generated PDF with headers and selected content.</p>
     </section>
   `;
 }
@@ -776,6 +848,9 @@ function wireTabEvents(): void {
   if (selectedTab === 'reports') {
     wireReportsEvents();
   }
+  if (selectedTab === 'report') {
+    wireReportBuilderEvents();
+  }
 }
 
 function wireSitesEvents(): void {
@@ -985,6 +1060,222 @@ function wireReportsEvents(): void {
     await saveWorkspace(workspace);
     render();
   });
+}
+
+function wireReportBuilderEvents(): void {
+  const runSelect = document.querySelector<HTMLSelectElement>('#report-run-select');
+  runSelect?.addEventListener('change', () => {
+    selectedResultRunId = runSelect.value;
+  });
+
+  document.querySelectorAll<HTMLInputElement>('[data-report-field]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const fieldId = input.dataset.reportField ?? '';
+      if (!fieldId) {
+        return;
+      }
+      if (input.checked) {
+        selectedReportFieldIds.add(fieldId);
+      } else {
+        selectedReportFieldIds.delete(fieldId);
+      }
+    });
+  });
+
+  document.querySelector<HTMLButtonElement>('#report-select-all-fields')?.addEventListener('click', () => {
+    selectedReportFieldIds = new Set<string>(RESULT_FIELD_OPTIONS.map((entry) => entry.id));
+    render();
+  });
+
+  document.querySelector<HTMLButtonElement>('#report-clear-fields')?.addEventListener('click', () => {
+    selectedReportFieldIds = new Set<string>();
+    render();
+  });
+
+  const bindToggle = (id: string, setter: (checked: boolean) => void) => {
+    const input = document.querySelector<HTMLInputElement>(id);
+    input?.addEventListener('change', () => setter(input.checked));
+  };
+
+  bindToggle('#report-include-map', (checked) => {
+    reportIncludeMap = checked;
+  });
+  bindToggle('#report-include-tx-radio', (checked) => {
+    reportIncludeTxRadio = checked;
+  });
+  bindToggle('#report-include-tx-antenna', (checked) => {
+    reportIncludeTxAntenna = checked;
+  });
+  bindToggle('#report-include-propagation', (checked) => {
+    reportIncludePropagationModel = checked;
+  });
+  bindToggle('#report-include-rx-antenna', (checked) => {
+    reportIncludeRxAntenna = checked;
+  });
+  bindToggle('#report-include-rx-radio', (checked) => {
+    reportIncludeRxRadio = checked;
+  });
+
+  document.querySelector<HTMLButtonElement>('#generate-pdf')?.addEventListener('click', async () => {
+    await generatePdfReport();
+  });
+}
+
+async function generatePdfReport(): Promise<void> {
+  const activeRun = workspace.reportHistory.find((run) => run.id === selectedResultRunId) ?? workspace.reportHistory[0] ?? null;
+  if (!activeRun) {
+    alert('No results available to generate a report.');
+    return;
+  }
+
+  const selectedFields = RESULT_FIELD_OPTIONS.filter((field) => selectedReportFieldIds.has(field.id));
+  if (!selectedFields.length) {
+    alert('Select at least one simulation results field for the report.');
+    return;
+  }
+
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  let y = margin;
+
+  const writeHeader = (title: string) => {
+    if (y > pageHeight - 80) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text(title, margin, y);
+    y += 16;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+  };
+
+  const writeWrapped = (text: string) => {
+    const lines = doc.splitTextToSize(text, pageWidth - margin * 2);
+    for (const line of lines) {
+      if (y > pageHeight - 40) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += 12;
+    }
+  };
+
+  writeHeader('RF Ranger Test Report');
+  writeWrapped(`Generated: ${new Date().toLocaleString()}`);
+  writeWrapped(`Result Run Time: ${new Date(activeRun.createdAtIso).toLocaleString()}`);
+  y += 8;
+
+  if (reportIncludeMap) {
+    writeHeader('Map View Render');
+    const mapDataUrl = captureMapSnapshot();
+    if (mapDataUrl) {
+      const imageWidth = pageWidth - margin * 2;
+      const imageHeight = Math.min(220, imageWidth * 0.6);
+      if (y + imageHeight > pageHeight - 40) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.addImage(mapDataUrl, 'PNG', margin, y, imageWidth, imageHeight);
+      y += imageHeight + 10;
+    } else {
+      writeWrapped('Map capture unavailable in this browser context. Open the Sites tab first, then regenerate.');
+    }
+    y += 8;
+  }
+
+  writeHeader('Simulation Results');
+  activeRun.rows.forEach((row, index) => {
+    writeWrapped(`Row ${index + 1}`);
+    for (const field of selectedFields) {
+      writeWrapped(`- ${field.label}: ${field.value(row)}`);
+    }
+    y += 6;
+  });
+
+  if (reportIncludeTxRadio) {
+    writeHeader('TX Radio Information');
+    const txRadios = uniqueBy(activeRun.rows.map((row) => row.transmitterRadio));
+    txRadios.forEach((radioName) => {
+      const entry = workspace.sources.find((source) => source.name === radioName);
+      if (!entry) {
+        writeWrapped(`- ${radioName}`);
+        return;
+      }
+      writeWrapped(`- ${entry.name}: ${entry.txPowerDbm} dBm, ${entry.carrierFrequencyMHz} MHz, ${(entry.bandwidthHz / 1000).toFixed(3)} kHz`);
+    });
+  }
+
+  if (reportIncludeTxAntenna) {
+    writeHeader('TX Antenna Information');
+    writeWrapped('Current simulation queue does not bind TX antennas per run; listing known antennas.');
+    workspace.antennas.forEach((antenna) => {
+      writeWrapped(`- ${antenna.name}: ${antenna.pattern}, ${antenna.heightM} m, az ${antenna.azimuthDeg} deg, tilt ${antenna.tiltDeg} deg`);
+    });
+  }
+
+  if (reportIncludePropagationModel) {
+    writeHeader('Propagation Model Information');
+    const modelIds = uniqueBy(
+      activeRun.rows.map((row) => {
+        const queueItem = workspace.simulationQueue.find((item) => item.id === row.queueItemId);
+        return queueItem?.propagationModelId ?? '';
+      })
+    ).filter(Boolean);
+    if (!modelIds.length) {
+      writeWrapped('No linked propagation model metadata found for this result run.');
+    } else {
+      modelIds.forEach((modelId) => {
+        const model = workspace.propagationModels.find((entry) => entry.id === modelId);
+        if (!model) {
+          return;
+        }
+        writeWrapped(`- ${model.name} (${model.modelType}): ${JSON.stringify(model.parameters)}`);
+      });
+    }
+  }
+
+  if (reportIncludeRxAntenna) {
+    writeHeader('RX Antenna Information');
+    writeWrapped('Current simulation queue does not bind RX antennas per run; listing known antennas.');
+    workspace.antennas.forEach((antenna) => {
+      writeWrapped(`- ${antenna.name}: ${antenna.pattern}, ${antenna.heightM} m, az ${antenna.azimuthDeg} deg, tilt ${antenna.tiltDeg} deg`);
+    });
+  }
+
+  if (reportIncludeRxRadio) {
+    writeHeader('RX Radio Information');
+    const rxRadios = uniqueBy(activeRun.rows.map((row) => row.receiverRadio));
+    rxRadios.forEach((radioName) => {
+      const entry = workspace.sinks.find((sink) => sink.name === radioName);
+      if (!entry) {
+        writeWrapped(`- ${radioName}`);
+        return;
+      }
+      writeWrapped(
+        `- ${entry.name}: ${entry.carrierFrequencyMHz} MHz, ${(entry.bandwidthHz / 1000).toFixed(3)} kHz, NF ${entry.noiseFigureDb} dB, Req SNR ${entry.requiredSnrDb} dB`
+      );
+    });
+  }
+
+  const stamp = new Date().toISOString().replaceAll(':', '-');
+  doc.save(`rf-ranger-report-${stamp}.pdf`);
+}
+
+function captureMapSnapshot(): string | null {
+  if (!map) {
+    return null;
+  }
+  try {
+    const canvas = map.getCanvas();
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  }
 }
 
 async function addSimulationQueueItem(): Promise<void> {
@@ -1901,6 +2192,10 @@ function prettyLabel(value: string): string {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (s) => s.toUpperCase())
     .trim();
+}
+
+function uniqueBy(values: string[]): string[] {
+  return Array.from(new Set(values));
 }
 
 function escapeHtml(raw: string): string {

@@ -1,6 +1,6 @@
 {
   "name": "rf-ranger",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
+    "jspdf": "^4.2.0",
     "katex": "^0.16.37",
     "maplibre-gl": "^4.7.1",
     "markdown-it": "^14.1.1",

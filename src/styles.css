@@ -246,6 +246,12 @@ fieldset.param-grid {
   gap: 0.5rem;
 }
 
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .pane-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;

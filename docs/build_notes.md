@@ -417,3 +417,23 @@
 - Known Issues / Next Focus:
   - Optional: add result-run naming/tagging and search/filter for large histories.
 - Commit: this commit (`milestone(M31): results buffering and report comment rollback v0.32.0`)
+
+## M32 - Report Tab and PDF Generator
+- Date: 2026-03-07
+- Version: 0.33.0
+- Completed:
+  - Added new `Report` tab with form-driven PDF generation.
+  - Added include toggles (default enabled) for:
+    - current map view render
+    - TX radio information
+    - TX antenna information
+    - propagation model information
+    - RX antenna information
+    - RX radio information
+  - Added selectable simulation-result field list (default all selected) with select-all/clear controls.
+  - Implemented PDF output with section headers and sequential section layout.
+  - Added result-run selector in Report tab to choose which buffered run to include.
+  - Added `jspdf` dependency for client-side PDF creation.
+- Known Issues / Next Focus:
+  - Map image capture can fail in browser contexts where canvas export is restricted; report includes fallback note in that case.
+- Commit: this commit (`milestone(M32): report tab pdf generator v0.33.0`)

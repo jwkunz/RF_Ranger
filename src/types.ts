@@ -5,6 +5,7 @@ export type TabId =
   | 'radios'
   | 'antennas'
   | 'propagation'
+  | 'report'
   | 'reports'
   | 'preferences'
   | 'help'
