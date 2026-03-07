@@ -4,6 +4,7 @@ import SimulationWorker from './simulationWorker?worker&inline';
 import './styles.css';
 import legalMarkdown from '../docs/LEGAL.md?raw';
 import manualMarkdown from '../docs/Manual.md?raw';
+import modelsMarkdown from '../docs/Models.md?raw';
 import { DEFAULT_WORKSPACE } from './defaults';
 import { exportReportsCsv, exportSitesKml, exportWorkspaceJson, parseSitesKml, parseWorkspaceJson } from './io';
 import { loadWorkspace, saveWorkspace } from './storage';
@@ -556,21 +557,29 @@ function renderPropagationTab(): string {
     )
     .join('');
 
+  const setupGuide = renderMarkdownSection(extractPropagationModelSection(activePropagationType, modelsMarkdown));
+
   return `
     <h2>Propagation Models</h2>
-    <section class="panel">
-      <h3>Add Propagation Model</h3>
-      <form id="add-prop-form" class="stack">
-        <input name="name" placeholder="Preset Name" required />
-        <label>Model Type
-          <select name="modelType" id="prop-model-type">${modelTypeOptions}</select>
-        </label>
-        <fieldset class="param-grid">
-          <legend>Model Parameters</legend>
-          ${parameterInputs}
-        </fieldset>
-        <button class="primary-btn" type="submit">Add Model</button>
-      </form>
+    <section class="panel propagation-layout">
+      <div>
+        <h3>Add Propagation Model</h3>
+        <form id="add-prop-form" class="stack">
+          <input name="name" placeholder="Preset Name" required />
+          <label>Model Type
+            <select name="modelType" id="prop-model-type">${modelTypeOptions}</select>
+          </label>
+          <fieldset class="param-grid">
+            <legend>Model Parameters</legend>
+            ${parameterInputs}
+          </fieldset>
+          <button class="primary-btn" type="submit">Add Model</button>
+        </form>
+      </div>
+      <aside class="propagation-guide">
+        <h3>Model Setup Guide</h3>
+        <div class="manual__body">${setupGuide}</div>
+      </aside>
     </section>
     <section class="panel">
       <h3>Known Propagation Models</h3>
@@ -1558,6 +1567,45 @@ function renderManualWithToc(markdown: string): { tocHtml: string; bodyHtml: str
     tocHtml: `<ul>${tocItems}</ul>`,
     bodyHtml: body.join('\n')
   };
+}
+
+function renderMarkdownSection(markdown: string): string {
+  return renderManualWithToc(markdown).bodyHtml;
+}
+
+function extractPropagationModelSection(modelType: PropagationModelType, markdown: string): string {
+  const lines = markdown.split('\n');
+  const headingNeedles: Record<PropagationModelType, string[]> = {
+    'Free Space': ['free-space path loss', 'free space path loss'],
+    'Two-Ray': ['two-ray ground reflection'],
+    'Knife-Edge': ['knife-edge diffraction', 'knife-edge'],
+    'Ground Wave': ['ground-wave propagation', 'ground wave propagation'],
+    Ionospheric: ['ionospheric skywave', 'ionospheric'],
+    'Log-Distance': ['log-distance path loss', 'log-distance'],
+    'Effective Earth Radius': ['effective earth radius', 'atmospheric refraction'],
+    Troposcatter: ['troposcatter model', 'troposcatter']
+  };
+
+  const topHeadingIndexes: number[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].startsWith('# ')) {
+      topHeadingIndexes.push(i);
+    }
+  }
+
+  const needles = headingNeedles[modelType].map((needle) => needle.toLowerCase());
+  const matchIndex = topHeadingIndexes.find((index) => {
+    const headingText = lines[index].slice(2).trim().toLowerCase();
+    return needles.some((needle) => headingText.includes(needle));
+  });
+
+  if (matchIndex == null) {
+    return `# ${modelType}\n\nNo setup text found in docs/Models.md for this model type yet.`;
+  }
+
+  const headingPosition = topHeadingIndexes.indexOf(matchIndex);
+  const endIndex = headingPosition >= 0 && headingPosition < topHeadingIndexes.length - 1 ? topHeadingIndexes[headingPosition + 1] : lines.length;
+  return lines.slice(matchIndex, endIndex).join('\n').trim();
 }
 
 function slugify(value: string): string {

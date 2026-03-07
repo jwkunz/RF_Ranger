@@ -197,6 +197,20 @@ fieldset.param-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.propagation-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(360px, 1.2fr) minmax(320px, 1fr);
+  align-items: start;
+}
+
+.propagation-guide {
+  border-left: 1px solid #94a3b8;
+  padding-left: 0.9rem;
+  max-height: 68vh;
+  overflow: auto;
+}
+
 .map-layout {
   display: grid;
   gap: 1rem;
@@ -291,6 +305,18 @@ fieldset.param-grid {
   .map-panel,
   #map-canvas {
     min-height: 50vh;
+  }
+
+  .propagation-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .propagation-guide {
+    border-left: none;
+    border-top: 1px solid #94a3b8;
+    padding-left: 0;
+    padding-top: 0.9rem;
+    max-height: none;
   }
 }
 

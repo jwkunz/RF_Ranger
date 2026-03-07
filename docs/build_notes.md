@@ -315,3 +315,16 @@
 - Known Issues / Next Focus:
   - Optional: add sort/filter controls in Reports for large simulation queues.
 - Commit: this commit (`milestone(M23): report tx-rx metadata columns v0.24.0`)
+
+## M24 - Propagation Model Contextual Setup Pane
+- Date: 2026-03-07
+- Version: 0.25.0
+- Completed:
+  - Added a right-side guidance pane to the Propagation Models tab.
+  - Wired model dropdown selection to load the corresponding section text from `docs/Models.md`.
+  - Added model-to-section matching logic for all supported propagation model types.
+  - Reused markdown rendering pipeline so section headers/body are displayed for setup guidance while selecting parameters.
+  - Added responsive layout styling so the guidance pane stacks below the form on narrow screens.
+- Known Issues / Next Focus:
+  - Table/math markdown in the guidance content is currently displayed as plain text lines; optional future enhancement is richer markdown rendering.
+- Commit: this commit (`milestone(M24): propagation model setup guidance pane v0.25.0`)
