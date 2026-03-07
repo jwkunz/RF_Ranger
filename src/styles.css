@@ -128,6 +128,11 @@ label {
   gap: 0.35rem;
 }
 
+.field-help {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 input,
 select,
 textarea,

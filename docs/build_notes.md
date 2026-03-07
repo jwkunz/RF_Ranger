@@ -352,3 +352,15 @@
 - Known Issues / Next Focus:
   - Optional: further normalize plain-text engineering expressions in prose into inline math for full consistency.
 - Commit: this commit (`milestone(M26): normalize models markdown math delimiters v0.27.0`)
+
+## M27 - Propagation Parameter Label/Symbol Alignment
+- Date: 2026-03-07
+- Version: 0.28.0
+- Completed:
+  - Added propagation parameter metadata for all supported models, including engineering label, symbol, units, and setup hint text.
+  - Updated Propagation Model entry panel to show parameter labels matching `docs/Models.md` symbols (e.g., `Γ`, `f_c`, `θ`, `n`, `k`, `d_1`, `d_2`).
+  - Preserved existing internal parameter keys used by the simulation engine to avoid behavior regressions.
+  - Added inline field-help styling for parameter guidance.
+- Known Issues / Next Focus:
+  - Optional: render symbols with full math typography in form labels, not just unicode/plain text.
+- Commit: this commit (`milestone(M27): align propagation parameter symbols v0.28.0`)

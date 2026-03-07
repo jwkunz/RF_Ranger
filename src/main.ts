@@ -51,6 +51,55 @@ const propagationParameterDefaults: Record<PropagationModelType, Record<string, 
   Troposcatter: { constantA: 120 }
 };
 
+const propagationParameterMeta: Record<
+  PropagationModelType,
+  Record<string, { label: string; symbol: string; units?: string; description: string }>
+> = {
+  'Free Space': {
+    additionalLossDb: {
+      label: 'Additional Loss',
+      symbol: 'L_add',
+      units: 'dB',
+      description: 'Extra path loss term added on top of FSPL.'
+    }
+  },
+  'Two-Ray': {
+    groundReflectionCoefficient: {
+      label: 'Ground Reflection Coefficient',
+      symbol: 'Γ',
+      description: 'Reflection coefficient for the ground-reflected path.'
+    },
+    txHeightM: { label: 'Transmitter Height', symbol: 'h_t', units: 'm', description: 'Transmitter antenna height above ground.' },
+    rxHeightM: { label: 'Receiver Height', symbol: 'h_r', units: 'm', description: 'Receiver antenna height above ground.' }
+  },
+  'Knife-Edge': {
+    obstacleHeightM: { label: 'Obstacle Height', symbol: 'h', units: 'm', description: 'Effective knife-edge obstruction height.' },
+    d1Km: { label: 'Tx-to-Obstacle Distance', symbol: 'd_1', units: 'km', description: 'Distance from transmitter to obstacle.' },
+    d2Km: { label: 'Obstacle-to-Rx Distance', symbol: 'd_2', units: 'km', description: 'Distance from obstacle to receiver.' }
+  },
+  'Ground Wave': {
+    conductivitySPerM: { label: 'Ground Conductivity', symbol: 'σ', units: 'S/m', description: 'Ground conductivity of the propagation surface.' },
+    dielectricConstant: { label: 'Relative Permittivity', symbol: 'ε_r', description: 'Ground relative dielectric constant.' }
+  },
+  Ionospheric: {
+    criticalFrequencyMHz: { label: 'Critical Frequency', symbol: 'f_c', units: 'MHz', description: 'Ionospheric critical frequency used in secant law.' },
+    incidenceAngleDeg: { label: 'Incidence Angle', symbol: 'θ', units: 'deg', description: 'Wave incidence angle into the ionosphere.' }
+  },
+  'Log-Distance': {
+    pathLossExponent: { label: 'Path Loss Exponent', symbol: 'n', description: 'Environment-dependent log-distance exponent.' },
+    referenceDistanceM: { label: 'Reference Distance', symbol: 'd_0', units: 'm', description: 'Reference distance for anchor loss.' },
+    referenceLossDb: { label: 'Reference Loss', symbol: 'PL(d_0)', units: 'dB', description: 'Path loss at the reference distance.' }
+  },
+  'Effective Earth Radius': {
+    kFactor: { label: 'Effective Earth Radius Factor', symbol: 'k', description: 'Effective Earth radius factor for refraction model.' },
+    txHeightM: { label: 'Transmitter Height', symbol: 'h_1', units: 'm', description: 'Transmitter antenna height used in LOS estimate.' },
+    rxHeightM: { label: 'Receiver Height', symbol: 'h_2', units: 'm', description: 'Receiver antenna height used in LOS estimate.' }
+  },
+  Troposcatter: {
+    constantA: { label: 'Empirical Constant', symbol: 'A', units: 'dB', description: 'Empirical constant in troposcatter loss model.' }
+  }
+};
+
 const modelGuideMarkdown = new MarkdownIt({ html: false, linkify: true, typographer: false }).use(texmath, {
   engine: katex,
   delimiters: 'dollars',
@@ -549,10 +598,13 @@ function renderPropagationTab(): string {
     .join('');
 
   const parameterInputs = Object.entries(propagationParameterDefaults[activePropagationType])
-    .map(
-      ([key, value]) =>
-        `<label>${prettyLabel(key)}<input data-prop-param="${key}" type="number" step="0.0001" value="${value}" /></label>`
-    )
+    .map(([key, value]) => {
+      const meta = propagationParameterMeta[activePropagationType]?.[key];
+      const units = meta?.units ? `, ${meta.units}` : '';
+      const header = meta ? `${meta.label} (${meta.symbol}${units})` : prettyLabel(key);
+      const description = meta?.description ? `<small class="field-help">${escapeHtml(meta.description)}</small>` : '';
+      return `<label>${escapeHtml(header)}<input data-prop-param="${key}" type="number" step="0.0001" value="${value}" />${description}</label>`;
+    })
     .join('');
 
   const rows = workspace.propagationModels
