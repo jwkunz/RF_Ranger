@@ -431,7 +431,7 @@ function renderReportsTab(): string {
             <th>Propagation Losses</th>
             <th>Incident RF Power Density</th>
             <th>Incident Electric Field</th>
-            <th>Available Power Density at Antenna</th>
+            <th>Signal Power Into Receiver</th>
             <th>Receiver Noise Floor</th>
             <th>SNR in Receiver</th>
             <th>Useable Link</th>

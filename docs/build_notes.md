@@ -376,3 +376,13 @@
 - Known Issues / Next Focus:
   - Optional: render engineering units with math-mode formatting where appropriate.
 - Commit: this commit (`milestone(M28): katex symbols in propagation labels v0.29.0`)
+
+## M29 - Report Field Label Rename
+- Date: 2026-03-07
+- Version: 0.30.0
+- Completed:
+  - Renamed report output label from `Available Power Density at Antenna` to `Signal Power Into Receiver`.
+  - Updated both Reports tab table header and CSV export header for consistent naming.
+- Known Issues / Next Focus:
+  - Optional: align remaining report labels with domain-specific glossary terms.
+- Commit: this commit (`milestone(M29): rename report signal power label v0.30.0`)

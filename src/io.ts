@@ -93,7 +93,7 @@ export function exportReportsCsv(rows: SimulationResultRow[]): void {
     'Propagation Losses',
     'Incident RF Power Density',
     'Incident Electric Field',
-    'Available Power Density at Antenna',
+    'Signal Power Into Receiver',
     'Receiver Noise Floor',
     'SNR in Receiver',
     'Useable Link'
