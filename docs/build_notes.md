@@ -386,3 +386,18 @@
 - Known Issues / Next Focus:
   - Optional: align remaining report labels with domain-specific glossary terms.
 - Commit: this commit (`milestone(M29): rename report signal power label v0.30.0`)
+
+## M30 - Sites UX + Cross-Entity Comments in Reports
+- Date: 2026-03-07
+- Version: 0.31.0
+- Completed:
+  - Added temporary click-preview marker (`×`) on the Sites map so users can verify placement before adding/updating a site.
+  - Replaced freeform color picker with concise predefined palette (Red/Green/Blue/Yellow/Orange/Cyan/Purple/Black/White).
+  - Updated site markers to show site names directly on map pins.
+  - Added comments fields to Site, Source Radio, Receiver Radio, Antenna, and Propagation Model definitions.
+  - Added site comment visibility on marker hover popup.
+  - Added entity comment columns to simulation reports and CSV export (TX/RX site and radio + propagation model comments).
+  - Added backward-compatible workspace normalization for new comments fields.
+- Known Issues / Next Focus:
+  - Antenna comments are now stored but not yet tied to per-run report rows because antenna selection is not currently part of the simulation queue model.
+- Commit: this commit (`milestone(M30): sites ux and entity comments in reports v0.31.0`)

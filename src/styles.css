@@ -302,6 +302,41 @@ fieldset.param-grid {
   vertical-align: middle;
 }
 
+.site-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(15, 23, 42, 0.75);
+  color: #f8fafc;
+  border-radius: 999px;
+  padding: 0.15rem 0.45rem 0.15rem 0.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.site-marker__dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  flex: 0 0 auto;
+}
+
+.site-marker__label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pending-site-marker {
+  color: #f59e0b;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.7);
+}
+
 @media (max-width: 1000px) {
   .map-layout {
     grid-template-columns: 1fr;

@@ -51,6 +51,18 @@ const propagationParameterDefaults: Record<PropagationModelType, Record<string, 
   Troposcatter: { constantA: 120 }
 };
 
+const SITE_COLOR_OPTIONS = [
+  { label: 'Red', value: '#dc2626' },
+  { label: 'Green', value: '#16a34a' },
+  { label: 'Blue', value: '#2563eb' },
+  { label: 'Yellow', value: '#eab308' },
+  { label: 'Orange', value: '#f97316' },
+  { label: 'Cyan', value: '#06b6d4' },
+  { label: 'Purple', value: '#7c3aed' },
+  { label: 'Black', value: '#000000' },
+  { label: 'White', value: '#ffffff' }
+] as const;
+
 const propagationParameterMeta: Record<
   PropagationModelType,
   Record<string, { label: string; symbol: string; units?: string; description: string }>
@@ -154,6 +166,7 @@ let workspace: WorkspaceSnapshot = structuredClone(DEFAULT_WORKSPACE);
 let activePropagationType: PropagationModelType = 'Free Space';
 let map: maplibregl.Map | null = null;
 let mapMarkers: maplibregl.Marker[] = [];
+let pendingClickMarker: maplibregl.Marker | null = null;
 let selectedSiteId = '';
 let selectedSimulationTxSiteId = '';
 let selectedSimulationSourceRadioId = '';
@@ -245,12 +258,20 @@ function renderWelcomeTab(): string {
 
 function renderSitesTab(): string {
   const selectedSite = workspace.sites.find((site) => site.id === selectedSiteId) ?? null;
+  const hasCustomColor = selectedSite ? !SITE_COLOR_OPTIONS.some((entry) => entry.value === selectedSite.pinColor) : false;
+  const colorOptions = [
+    ...SITE_COLOR_OPTIONS.map(
+      (entry) => `<option value="${entry.value}" ${selectedSite?.pinColor === entry.value ? 'selected' : ''}>${entry.label}</option>`
+    ),
+    ...(hasCustomColor && selectedSite ? [`<option value="${selectedSite.pinColor}" selected>Custom (${selectedSite.pinColor})</option>`] : [])
+  ].join('');
   const siteRows = workspace.sites
     .map((site) => {
       const selectedClass = site.id === selectedSiteId ? ' class="focus-row"' : '';
       return `<tr${selectedClass}>
         <td><span class="site-color-chip" style="background:${escapeHtml(site.pinColor)}"></span>${escapeHtml(site.name)}</td>
         <td>${site.latitude.toFixed(6)}, ${site.longitude.toFixed(6)}</td>
+        <td>${escapeHtml(site.comments || '')}</td>
         <td><button data-select-site="${site.id}">Select</button> <button data-delete-site="${site.id}">Delete</button></td>
       </tr>`;
     })
@@ -266,9 +287,12 @@ function renderSitesTab(): string {
       <aside class="panel stack map-controls map-controls--right">
         <h3>Site Properties</h3>
         <label>Name<input id="site-name" value="${escapeHtml(selectedSite?.name ?? '')}" placeholder="Site name" /></label>
-        <label>Pin Color<input id="site-color" type="color" value="${escapeHtml(selectedSite?.pinColor ?? '#2563eb')}" /></label>
+        <label>Pin Color
+          <select id="site-color">${colorOptions}</select>
+        </label>
         <label>Latitude<input id="site-lat" type="number" step="0.000001" value="${selectedSite ? selectedSite.latitude : ''}" /></label>
         <label>Longitude<input id="site-lon" type="number" step="0.000001" value="${selectedSite ? selectedSite.longitude : ''}" /></label>
+        <label>Comments<textarea id="site-comments" rows="4" placeholder="Notes about this site">${escapeHtml(selectedSite?.comments ?? '')}</textarea></label>
         <div class="action-row">
           <button id="add-site-coord">Add Site (Coordinates)</button>
           <button id="update-site" ${selectedSite ? '' : 'disabled'}>Update Selected</button>
@@ -288,10 +312,10 @@ function renderSitesTab(): string {
     <section class="panel">
       <h3>Defined Sites</h3>
       <table>
-        <thead><tr><th>Name</th><th>Coordinates</th><th>Actions</th></tr></thead>
-        <tbody>${siteRows || '<tr><td colspan="3">No sites yet.</td></tr>'}</tbody>
+        <thead><tr><th>Name</th><th>Coordinates</th><th>Comments</th><th>Actions</th></tr></thead>
+        <tbody>${siteRows || '<tr><td colspan="4">No sites yet.</td></tr>'}</tbody>
       </table>
-      <p class="muted">Click the map to fill latitude/longitude, then add or update a site.</p>
+      <p class="muted">Click the map to place a temporary X preview, then add or update a site.</p>
     </section>
   `;
 }
@@ -394,6 +418,11 @@ function renderReportsTab(): string {
         <td>${escapeHtml(row.receiverSiteName)}</td>
         <td>${escapeHtml(row.receiverCoordinates)}</td>
         <td>${escapeHtml(row.receiverRadio)}</td>
+        <td>${escapeHtml(row.transmitterSiteComments)}</td>
+        <td>${escapeHtml(row.transmitterRadioComments)}</td>
+        <td>${escapeHtml(row.propagationModelComments)}</td>
+        <td>${escapeHtml(row.receiverSiteComments)}</td>
+        <td>${escapeHtml(row.receiverRadioComments)}</td>
         <td>${formatPowerDensity(row.transmitterEirpDensityDbmPerHz)}</td>
         <td>${formatDistance(row.distanceKm)}</td>
         <td>${row.propagationLossesDb.toFixed(2)} dB</td>
@@ -426,6 +455,11 @@ function renderReportsTab(): string {
             <th>Receiver Site Name</th>
             <th>Receiver Coordinates</th>
             <th>Receiver Radio</th>
+            <th>Transmitter Site Comments</th>
+            <th>Transmitter Radio Comments</th>
+            <th>Propagation Model Comments</th>
+            <th>Receiver Site Comments</th>
+            <th>Receiver Radio Comments</th>
             <th>Transmitter EIRP Density</th>
             <th>Distance</th>
             <th>Propagation Losses</th>
@@ -439,7 +473,7 @@ function renderReportsTab(): string {
             <th>Jump</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="19">No report data. Launch simulations from the Simulation tab.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="24">No report data. Launch simulations from the Simulation tab.</td></tr>'}</tbody>
       </table>
     </section>
   `;
@@ -479,6 +513,7 @@ function renderRadiosTab(): string {
       (source) => `
       <tr>
         <td>${escapeHtml(source.name)}</td>
+        <td>${escapeHtml(source.comments || '')}</td>
         <td>${source.txPowerDbm}</td>
         <td>${source.carrierFrequencyMHz}</td>
         <td>${(source.bandwidthHz / 1000).toFixed(3)}</td>
@@ -493,6 +528,7 @@ function renderRadiosTab(): string {
       (sink) => `
       <tr>
         <td>${escapeHtml(sink.name)}</td>
+        <td>${escapeHtml(sink.comments || '')}</td>
         <td>${sink.carrierFrequencyMHz}</td>
         <td>${(sink.bandwidthHz / 1000).toFixed(3)}</td>
         <td>${sink.environmentNoiseTemperatureK}</td>
@@ -509,6 +545,7 @@ function renderRadiosTab(): string {
       <h3>Add Source</h3>
       <form id="add-source-form" class="grid-form">
         <label>Name<input name="name" placeholder="e.g. Base TX" required /></label>
+        <label>Comments<textarea name="comments" rows="2" placeholder="Source notes"></textarea></label>
         <label>TX Power (dBm)<input name="txPowerDbm" type="number" step="0.1" required /></label>
         <label>Carrier Frequency (MHz)<input name="carrierFrequencyMHz" type="number" step="0.001" required /></label>
         <label>Bandwidth (kHz)<input name="bandwidthKHz" type="number" step="0.001" required /></label>
@@ -519,14 +556,15 @@ function renderRadiosTab(): string {
     <section class="panel">
       <h3>Sources</h3>
       <table>
-        <thead><tr><th>Name</th><th>TX Power (dBm)</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>NF (dB)</th><th>Actions</th></tr></thead>
-        <tbody>${sourceRows || '<tr><td colspan="6">No sources yet.</td></tr>'}</tbody>
+        <thead><tr><th>Name</th><th>Comments</th><th>TX Power (dBm)</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>NF (dB)</th><th>Actions</th></tr></thead>
+        <tbody>${sourceRows || '<tr><td colspan="7">No sources yet.</td></tr>'}</tbody>
       </table>
     </section>
     <section class="panel">
       <h3>Add Sink</h3>
       <form id="add-sink-form" class="grid-form">
         <label>Name<input name="name" placeholder="e.g. Remote RX 1" required /></label>
+        <label>Comments<textarea name="comments" rows="2" placeholder="Receiver notes"></textarea></label>
         <label>Carrier Frequency (MHz)<input name="carrierFrequencyMHz" type="number" step="0.001" required /></label>
         <label>Bandwidth (kHz)<input name="bandwidthKHz" type="number" step="0.001" required /></label>
         <label>Environment Noise Temperature (K)<input name="environmentNoiseTemperatureK" type="number" step="1" value="300" required /></label>
@@ -538,8 +576,8 @@ function renderRadiosTab(): string {
     <section class="panel">
       <h3>Sinks</h3>
       <table>
-        <thead><tr><th>Name</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>Env Temp (K)</th><th>NF (dB)</th><th>Req SNR (dB)</th><th>Actions</th></tr></thead>
-        <tbody>${sinkRows || '<tr><td colspan="7">No sinks yet.</td></tr>'}</tbody>
+        <thead><tr><th>Name</th><th>Comments</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>Env Temp (K)</th><th>NF (dB)</th><th>Req SNR (dB)</th><th>Actions</th></tr></thead>
+        <tbody>${sinkRows || '<tr><td colspan="8">No sinks yet.</td></tr>'}</tbody>
       </table>
     </section>
   `;
@@ -551,6 +589,7 @@ function renderAntennasTab(): string {
       (antenna) => `
       <tr>
         <td>${escapeHtml(antenna.name)}</td>
+        <td>${escapeHtml(antenna.comments || '')}</td>
         <td>${antenna.heightM}</td>
         <td>${antenna.azimuthDeg}</td>
         <td>${antenna.tiltDeg}</td>
@@ -568,6 +607,7 @@ function renderAntennasTab(): string {
       <h3>Add Antenna</h3>
       <form id="add-antenna-form" class="grid-form">
         <input name="name" placeholder="Name" required />
+        <textarea name="comments" rows="2" placeholder="Antenna notes"></textarea>
         <input name="heightM" type="number" step="0.1" placeholder="Height (m)" required />
         <input name="azimuthDeg" type="number" step="0.1" placeholder="Azimuth (deg)" required />
         <input name="tiltDeg" type="number" step="0.1" placeholder="Tilt (deg)" required />
@@ -590,8 +630,8 @@ function renderAntennasTab(): string {
     <section class="panel">
       <h3>Known Antennas</h3>
       <table>
-        <thead><tr><th>Name</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Gain</th><th>Actions</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="8">No antennas yet.</td></tr>'}</tbody>
+        <thead><tr><th>Name</th><th>Comments</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Gain</th><th>Actions</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="9">No antennas yet.</td></tr>'}</tbody>
       </table>
     </section>
   `;
@@ -620,6 +660,7 @@ function renderPropagationTab(): string {
       (model) => `
       <tr>
         <td>${escapeHtml(model.name)}</td>
+        <td>${escapeHtml(model.comments || '')}</td>
         <td>${model.modelType}</td>
         <td><code>${escapeHtml(JSON.stringify(model.parameters))}</code></td>
         <td><button data-edit-prop="${model.id}">Edit</button> <button data-delete-prop="${model.id}">Delete</button></td>
@@ -636,6 +677,7 @@ function renderPropagationTab(): string {
         <h3>Add Propagation Model</h3>
         <form id="add-prop-form" class="stack">
           <input name="name" placeholder="Preset Name" required />
+          <label>Comments<textarea name="comments" rows="3" placeholder="Model setup notes"></textarea></label>
           <label>Model Type
             <select name="modelType" id="prop-model-type">${modelTypeOptions}</select>
           </label>
@@ -654,8 +696,8 @@ function renderPropagationTab(): string {
     <section class="panel">
       <h3>Known Propagation Models</h3>
       <table>
-        <thead><tr><th>Name</th><th>Type</th><th>Parameters</th><th>Actions</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="4">No propagation models yet.</td></tr>'}</tbody>
+        <thead><tr><th>Name</th><th>Comments</th><th>Type</th><th>Parameters</th><th>Actions</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5">No propagation models yet.</td></tr>'}</tbody>
       </table>
     </section>
   `;
@@ -992,6 +1034,7 @@ async function runSimulationQueue(): Promise<void> {
 async function addSiteFromForm(): Promise<void> {
   const nameInput = document.querySelector<HTMLInputElement>('#site-name');
   const colorInput = document.querySelector<HTMLInputElement>('#site-color');
+  const commentsInput = document.querySelector<HTMLTextAreaElement>('#site-comments');
   const latInput = document.querySelector<HTMLInputElement>('#site-lat');
   const lonInput = document.querySelector<HTMLInputElement>('#site-lon');
 
@@ -1005,12 +1048,17 @@ async function addSiteFromForm(): Promise<void> {
   const site: Site = {
     id: uid(),
     name: nameInput?.value.trim() || `Site ${workspace.sites.length + 1}`,
+    comments: commentsInput?.value.trim() || '',
     latitude: lat,
     longitude: lon,
     pinColor: colorInput?.value || '#2563eb'
   };
   workspace.sites.push(site);
   selectedSiteId = site.id;
+  if (pendingClickMarker) {
+    pendingClickMarker.remove();
+    pendingClickMarker = null;
+  }
   ensureSelectionDefaults();
   await saveWorkspace(workspace);
   captureMapViewport();
@@ -1029,6 +1077,7 @@ async function updateSelectedSiteFromForm(): Promise<void> {
 
   const nameInput = document.querySelector<HTMLInputElement>('#site-name');
   const colorInput = document.querySelector<HTMLInputElement>('#site-color');
+  const commentsInput = document.querySelector<HTMLTextAreaElement>('#site-comments');
   const latInput = document.querySelector<HTMLInputElement>('#site-lat');
   const lonInput = document.querySelector<HTMLInputElement>('#site-lon');
 
@@ -1040,9 +1089,14 @@ async function updateSelectedSiteFromForm(): Promise<void> {
   }
 
   site.name = nameInput?.value.trim() || site.name;
+  site.comments = commentsInput?.value.trim() || '';
   site.pinColor = colorInput?.value || site.pinColor;
   site.latitude = lat;
   site.longitude = lon;
+  if (pendingClickMarker) {
+    pendingClickMarker.remove();
+    pendingClickMarker = null;
+  }
 
   await saveWorkspace(workspace);
   captureMapViewport();
@@ -1092,6 +1146,7 @@ function initMap(): void {
       latInput.value = String(lat);
       lonInput.value = String(lon);
     }
+    renderPendingClickMarker(lat, lon);
   });
 
   map.on('moveend', () => {
@@ -1113,16 +1168,45 @@ function initMap(): void {
   }
 
   mapMarkers = workspace.sites.map((site) => {
-    const marker = new maplibregl.Marker({ color: site.pinColor }).setLngLat([site.longitude, site.latitude]).setPopup(
-      new maplibregl.Popup().setHTML(`<strong>${escapeHtml(site.name)}</strong>`)
+    const element = document.createElement('div');
+    element.className = 'site-marker';
+    element.innerHTML = `<span class="site-marker__dot" style="background:${escapeHtml(site.pinColor)}"></span><span class="site-marker__label">${escapeHtml(site.name)}</span>`;
+    const marker = new maplibregl.Marker({ element }).setLngLat([site.longitude, site.latitude]).setPopup(
+      new maplibregl.Popup().setHTML(
+        `<strong>${escapeHtml(site.name)}</strong>${site.comments ? `<div class="muted">${escapeHtml(site.comments)}</div>` : ''}`
+      )
     );
     marker.addTo(map as maplibregl.Map);
     marker.getElement().addEventListener('click', () => {
       selectedSiteId = site.id;
       render();
     });
+    marker.getElement().addEventListener('mouseenter', () => marker.togglePopup());
+    marker.getElement().addEventListener('mouseleave', () => marker.getPopup()?.remove());
     return marker;
   });
+
+  const selectedForPending = workspace.sites.find((site) => site.id === selectedSiteId);
+  if (selectedForPending) {
+    renderPendingClickMarker(selectedForPending.latitude, selectedForPending.longitude);
+  } else if (pendingClickMarker) {
+    pendingClickMarker.remove();
+    pendingClickMarker = null;
+  }
+}
+
+function renderPendingClickMarker(lat: number, lon: number): void {
+  if (!map) {
+    return;
+  }
+  if (pendingClickMarker) {
+    pendingClickMarker.remove();
+    pendingClickMarker = null;
+  }
+  const element = document.createElement('div');
+  element.className = 'pending-site-marker';
+  element.textContent = '×';
+  pendingClickMarker = new maplibregl.Marker({ element }).setLngLat([lon, lat]).addTo(map);
 }
 
 async function geocodeAddress(query: string): Promise<{ lat: number; lon: number } | null> {
@@ -1160,6 +1244,7 @@ function wireRadiosEvents(): void {
     const source: RadioSource = {
       id: uid(),
       name: String(data.get('name') ?? ''),
+      comments: String(data.get('comments') ?? '').trim(),
       txPowerDbm: toNumber(data.get('txPowerDbm')),
       carrierFrequencyMHz: toNumber(data.get('carrierFrequencyMHz')),
       bandwidthHz: toNumber(data.get('bandwidthKHz')) * 1000,
@@ -1178,6 +1263,7 @@ function wireRadiosEvents(): void {
     const sink: RadioSink = {
       id: uid(),
       name: String(data.get('name') ?? ''),
+      comments: String(data.get('comments') ?? '').trim(),
       carrierFrequencyMHz: toNumber(data.get('carrierFrequencyMHz')),
       bandwidthHz: toNumber(data.get('bandwidthKHz')) * 1000,
       environmentNoiseTemperatureK: toNumber(data.get('environmentNoiseTemperatureK') ?? '300') || 300,
@@ -1221,6 +1307,8 @@ function wireRadiosEvents(): void {
         return;
       }
       source.name = name;
+      const comments = prompt('Source Comments', source.comments ?? '');
+      source.comments = comments ?? source.comments ?? '';
       await saveWorkspace(workspace);
       render();
     });
@@ -1237,6 +1325,8 @@ function wireRadiosEvents(): void {
         return;
       }
       sink.name = name;
+      const comments = prompt('Sink Comments', sink.comments ?? '');
+      sink.comments = comments ?? sink.comments ?? '';
       await saveWorkspace(workspace);
       render();
     });
@@ -1252,6 +1342,7 @@ function wireAntennaEvents(): void {
     const antenna: AntennaModel = {
       id: uid(),
       name: String(data.get('name') ?? ''),
+      comments: String(data.get('comments') ?? '').trim(),
       heightM: toNumber(data.get('heightM')),
       azimuthDeg: toNumber(data.get('azimuthDeg')),
       tiltDeg: toNumber(data.get('tiltDeg')),
@@ -1284,6 +1375,8 @@ function wireAntennaEvents(): void {
         return;
       }
       antenna.name = name;
+      const comments = prompt('Antenna Comments', antenna.comments ?? '');
+      antenna.comments = comments ?? antenna.comments ?? '';
       await saveWorkspace(workspace);
       render();
     });
@@ -1310,6 +1403,7 @@ function wirePropagationEvents(): void {
     const model: PropagationModel = {
       id: uid(),
       name: String(data.get('name') ?? ''),
+      comments: String(data.get('comments') ?? '').trim(),
       modelType: modelTypeValue,
       parameters: Object.fromEntries(parameterEntries)
     };
@@ -1341,6 +1435,8 @@ function wirePropagationEvents(): void {
         return;
       }
       model.name = name;
+      const comments = prompt('Propagation Model Comments', model.comments ?? '');
+      model.comments = comments ?? model.comments ?? '';
       await saveWorkspace(workspace);
       render();
     });
@@ -1394,10 +1490,10 @@ function wirePreferencesEvents(): void {
 function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
   const work = raw as unknown as {
     schemaVersion?: number;
-    sources?: RadioSource[];
+    sources?: Array<RadioSource & { comments?: string }>;
     sinks?: Array<RadioSink & { environmentNoiseTemperatureK?: number; noiseFigureDb?: number; requiredSnrDb?: number }>;
-    antennas?: AntennaModel[];
-    propagationModels?: PropagationModel[];
+    antennas?: Array<AntennaModel & { comments?: string }>;
+    propagationModels?: Array<PropagationModel & { comments?: string }>;
     sites?: Site[];
     pins?: Array<{
       id: string;
@@ -1419,9 +1515,25 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
 
   const sinks = (work.sinks ?? []).map((sink) => ({
     ...sink,
+    comments: sink.comments ?? '',
     environmentNoiseTemperatureK: sink.environmentNoiseTemperatureK ?? 300,
     noiseFigureDb: sink.noiseFigureDb ?? 10,
     requiredSnrDb: sink.requiredSnrDb ?? 15
+  }));
+
+  const sources = (work.sources ?? []).map((source) => ({
+    ...source,
+    comments: source.comments ?? ''
+  }));
+
+  const antennas = (work.antennas ?? []).map((antenna) => ({
+    ...antenna,
+    comments: antenna.comments ?? ''
+  }));
+
+  const propagationModels = (work.propagationModels ?? []).map((model) => ({
+    ...model,
+    comments: model.comments ?? ''
   }));
 
   let sites: Site[] = [];
@@ -1432,6 +1544,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
         ...site,
         id: site.id || uid(),
         name: site.name || `Site ${index + 1}`,
+        comments: site.comments ?? '',
         pinColor: site.pinColor || '#2563eb'
       }));
   } else if (Array.isArray(work.pins)) {
@@ -1440,6 +1553,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
       .map((pin, index) => ({
         id: pin.id || uid(),
         name: pin.name || `Site ${index + 1}`,
+        comments: '',
         latitude: pin.latitude,
         longitude: pin.longitude,
         pinColor: pin.kind === 'source' ? '#dc2626' : '#2563eb'
@@ -1458,6 +1572,11 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     receiverSiteName: row.receiverSiteName ?? row.sinkName ?? 'Unknown RX Site',
     receiverCoordinates: row.receiverCoordinates ?? '',
     receiverRadio: row.receiverRadio ?? 'Unknown RX Radio',
+    transmitterSiteComments: row.transmitterSiteComments ?? '',
+    transmitterRadioComments: row.transmitterRadioComments ?? '',
+    propagationModelComments: row.propagationModelComments ?? '',
+    receiverSiteComments: row.receiverSiteComments ?? '',
+    receiverRadioComments: row.receiverRadioComments ?? '',
     sourceName: row.sourceName ?? 'Unknown Source',
     sinkName: row.sinkName ?? 'Unknown Sink',
     transmitterEirpDensityDbmPerHz: row.transmitterEirpDensityDbmPerHz ?? 0,
@@ -1474,10 +1593,10 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
 
   return {
     schemaVersion: 1,
-    sources: work.sources ?? [],
+    sources,
     sinks,
-    antennas: work.antennas ?? [],
-    propagationModels: work.propagationModels ?? [],
+    antennas,
+    propagationModels,
     sites,
     simulationQueue: work.simulationQueue ?? [],
     preferences,

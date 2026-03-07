@@ -36,6 +36,7 @@ export type PropagationModelType =
 export interface RadioSource {
   id: string;
   name: string;
+  comments: string;
   txPowerDbm: number;
   carrierFrequencyMHz: number;
   bandwidthHz: number;
@@ -45,6 +46,7 @@ export interface RadioSource {
 export interface RadioSink {
   id: string;
   name: string;
+  comments: string;
   carrierFrequencyMHz: number;
   bandwidthHz: number;
   environmentNoiseTemperatureK: number;
@@ -55,6 +57,7 @@ export interface RadioSink {
 export interface AntennaModel {
   id: string;
   name: string;
+  comments: string;
   heightM: number;
   azimuthDeg: number;
   tiltDeg: number;
@@ -66,6 +69,7 @@ export interface AntennaModel {
 export interface PropagationModel {
   id: string;
   name: string;
+  comments: string;
   modelType: PropagationModelType;
   parameters: Record<string, number>;
 }
@@ -73,6 +77,7 @@ export interface PropagationModel {
 export interface Site {
   id: string;
   name: string;
+  comments: string;
   latitude: number;
   longitude: number;
   pinColor: string;
@@ -99,6 +104,11 @@ export interface SimulationResultRow {
   receiverSiteName: string;
   receiverCoordinates: string;
   receiverRadio: string;
+  transmitterSiteComments: string;
+  transmitterRadioComments: string;
+  propagationModelComments: string;
+  receiverSiteComments: string;
+  receiverRadioComments: string;
   sourceName: string;
   sinkName: string;
   transmitterEirpDensityDbmPerHz: number;
