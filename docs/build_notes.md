@@ -484,3 +484,17 @@
 - Known Issues / Next Focus:
   - Single-file bundle size continues to grow as report generation features expand.
 - Commit: this commit (`milestone(M35): report include tree and site-view pdf fix v0.36.0`)
+
+## M36 - Multi-Run Visible Results + Report Pagination by Visible Runs
+- Date: 2026-03-07
+- Version: 0.37.0
+- Completed:
+  - Updated Results top pane to render a combined multi-row table across all checkbox-visible runs.
+  - Added visibility checkbox per buffered run in Results queue pane.
+  - Added queue actions for `Select All` and `Clear Selection` visibility control.
+  - Updated CSV export to include all rows from currently visible runs.
+  - Updated Report tab to remove run dropdown and replace with read-only visible run list from Results.
+  - Updated report generation to create one unique PDF page per visible result run.
+- Known Issues / Next Focus:
+  - Very large visible run sets can produce large PDFs; optional future enhancement is per-page row limits/tables.
+- Commit: this commit (`milestone(M36): visible-run results and report pagination v0.37.0`)

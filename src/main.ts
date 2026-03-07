@@ -296,6 +296,7 @@ let progress: ProgressState = { running: false, completed: 0, total: 0, message:
 let focusedReportQueueItemId = '';
 let selectedResultRunId = '';
 let selectedSavedSiteViewId = '';
+let visibleResultRunIds = new Set<string>();
 let selectedReportTreeIds = new Set<string>(
   REPORT_TREE.flatMap((category) => [category.id, ...category.fields.map((field) => field.id)])
 );
@@ -599,11 +600,19 @@ function renderSimulationTab(): string {
 }
 
 function renderReportsTab(): string {
-  const selectedRun = workspace.reportHistory.find((run) => run.id === selectedResultRunId) ?? workspace.reportHistory[0] ?? null;
-  const rows = (selectedRun?.rows ?? workspace.reportLatest)
-    .map((row) => {
+  const visibleRuns = getVisibleResultRuns();
+  const visibleRows = visibleRuns.flatMap((run) =>
+    run.rows.map((row) => ({
+      runStamp: new Date(run.createdAtIso).toLocaleString(),
+      row
+    }))
+  );
+  const rows = visibleRows
+    .map((entry) => {
+      const row = entry.row;
       const highlighted = row.queueItemId === focusedReportQueueItemId ? ' class="focus-row"' : '';
       return `<tr${highlighted}>
+        <td>${escapeHtml(entry.runStamp)}</td>
         <td>${escapeHtml(row.transmitterSiteName)}</td>
         <td>${escapeHtml(row.transmitterCoordinates)}</td>
         <td>${escapeHtml(row.transmitterRadio)}</td>
@@ -629,14 +638,15 @@ function renderReportsTab(): string {
 
   const runRows = workspace.reportHistory
     .map((run, index) => {
-      const selectedClass = run.id === selectedRun?.id ? ' class="focus-row"' : '';
+      const selectedClass = visibleResultRunIds.has(run.id) ? ' class="focus-row"' : '';
       const stamp = new Date(run.createdAtIso).toLocaleString();
+      const checked = visibleResultRunIds.has(run.id) ? 'checked' : '';
       return `<tr${selectedClass}>
+        <td><input type="checkbox" data-toggle-visible-run="${run.id}" ${checked} /></td>
         <td>${index + 1}</td>
         <td>${escapeHtml(stamp)}</td>
         <td>${run.rows.length}</td>
         <td>
-          <button data-select-result-run="${run.id}">View</button>
           <button data-delete-result-run="${run.id}">Remove</button>
         </td>
       </tr>`;
@@ -652,6 +662,7 @@ function renderReportsTab(): string {
       <table>
         <thead>
           <tr>
+            <th>Run Time</th>
             <th>Transmitter Site Name</th>
             <th>Transmitter Coordinates</th>
             <th>Transmitter Radio</th>
@@ -673,29 +684,31 @@ function renderReportsTab(): string {
             <th>Jump</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="19">No result data. Launch simulations from the Simulation tab.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="20">No visible result data. Check runs in the queue below.</td></tr>'}</tbody>
       </table>
     </section>
     <section class="panel">
       <div class="action-row">
         <h3>Buffered Results Queue</h3>
+        <button id="select-all-visible-runs" ${workspace.reportHistory.length ? '' : 'disabled'}>Select All</button>
+        <button id="clear-visible-runs" ${workspace.reportHistory.length ? '' : 'disabled'}>Clear Selection</button>
         <button id="clear-all-results" ${workspace.reportHistory.length ? '' : 'disabled'}>Clear All</button>
       </div>
       <table>
-        <thead><tr><th>#</th><th>Run Time</th><th>Rows</th><th>Actions</th></tr></thead>
-        <tbody>${runRows || '<tr><td colspan="4">No buffered results yet.</td></tr>'}</tbody>
+        <thead><tr><th>View</th><th>#</th><th>Run Time</th><th>Rows</th><th>Actions</th></tr></thead>
+        <tbody>${runRows || '<tr><td colspan="5">No buffered results yet.</td></tr>'}</tbody>
       </table>
     </section>
   `;
 }
 
 function renderReportBuilderTab(): string {
-  const activeRun = workspace.reportHistory.find((run) => run.id === selectedResultRunId) ?? workspace.reportHistory[0] ?? null;
+  const visibleRuns = getVisibleResultRuns();
   const activeSavedSiteView = workspace.savedSiteViews.find((view) => view.id === selectedSavedSiteViewId) ?? workspace.savedSiteViews[0] ?? null;
-  const runOptions = workspace.reportHistory
+  const visibleRunRows = visibleRuns
     .map((run, index) => {
       const stamp = new Date(run.createdAtIso).toLocaleString();
-      return `<option value="${run.id}" ${run.id === activeRun?.id ? 'selected' : ''}>Run ${index + 1} - ${escapeHtml(stamp)} (${run.rows.length} rows)</option>`;
+      return `<tr><td>${index + 1}</td><td>${escapeHtml(stamp)}</td><td>${run.rows.length}</td></tr>`;
     })
     .join('');
   const savedSiteViewOptions = workspace.savedSiteViews
@@ -723,9 +736,13 @@ function renderReportBuilderTab(): string {
   return `
     <h2>Report</h2>
     <section class="panel stack">
-      <label>Result Run
-        <select id="report-run-select">${runOptions || '<option value="">No results available</option>'}</select>
-      </label>
+      <div>
+        <h3>Visible Runs (Read Only)</h3>
+        <table>
+          <thead><tr><th>#</th><th>Run Time</th><th>Rows</th></tr></thead>
+          <tbody>${visibleRunRows || '<tr><td colspan="3">No runs selected in Results tab.</td></tr>'}</tbody>
+        </table>
+      </div>
       <label>Saved Site View
         <select id="report-saved-site-view-select">${savedSiteViewOptions || '<option value="">No saved site views available</option>'}</select>
       </label>
@@ -1237,8 +1254,7 @@ function wireSimulationEvents(): void {
 }
 
 function wireReportsEvents(): void {
-  const selectedRun = workspace.reportHistory.find((run) => run.id === selectedResultRunId) ?? workspace.reportHistory[0] ?? null;
-  const rows = selectedRun?.rows ?? workspace.reportLatest;
+  const rows = getVisibleResultRuns().flatMap((run) => run.rows);
 
   document.querySelector<HTMLButtonElement>('#export-csv')?.addEventListener('click', () => {
     exportReportsCsv(rows);
@@ -1257,9 +1273,17 @@ function wireReportsEvents(): void {
     });
   });
 
-  document.querySelectorAll<HTMLButtonElement>('[data-select-result-run]').forEach((button) => {
+  document.querySelectorAll<HTMLInputElement>('[data-toggle-visible-run]').forEach((button) => {
     button.addEventListener('click', () => {
-      selectedResultRunId = button.dataset.selectResultRun ?? '';
+      const runId = button.dataset.toggleVisibleRun ?? '';
+      if (!runId) {
+        return;
+      }
+      if (button.checked) {
+        visibleResultRunIds.add(runId);
+      } else {
+        visibleResultRunIds.delete(runId);
+      }
       render();
     });
   });
@@ -1268,9 +1292,7 @@ function wireReportsEvents(): void {
     button.addEventListener('click', async () => {
       const id = button.dataset.deleteResultRun ?? '';
       workspace.reportHistory = workspace.reportHistory.filter((run) => run.id !== id);
-      if (selectedResultRunId === id) {
-        selectedResultRunId = workspace.reportHistory[0]?.id ?? '';
-      }
+      visibleResultRunIds.delete(id);
       workspace.reportLatest = workspace.reportHistory[0]?.rows ?? [];
       await saveWorkspace(workspace);
       render();
@@ -1281,17 +1303,24 @@ function wireReportsEvents(): void {
     workspace.reportHistory = [];
     workspace.reportLatest = [];
     selectedResultRunId = '';
+    visibleResultRunIds.clear();
     await saveWorkspace(workspace);
+    render();
+  });
+
+  document.querySelector<HTMLButtonElement>('#select-all-visible-runs')?.addEventListener('click', () => {
+    visibleResultRunIds = new Set(workspace.reportHistory.map((run) => run.id));
+    render();
+  });
+
+  document.querySelector<HTMLButtonElement>('#clear-visible-runs')?.addEventListener('click', () => {
+    visibleResultRunIds.clear();
     render();
   });
 }
 
 function wireReportBuilderEvents(): void {
-  const runSelect = document.querySelector<HTMLSelectElement>('#report-run-select');
   const savedSiteViewSelect = document.querySelector<HTMLSelectElement>('#report-saved-site-view-select');
-  runSelect?.addEventListener('change', () => {
-    selectedResultRunId = runSelect.value;
-  });
   savedSiteViewSelect?.addEventListener('change', () => {
     selectedSavedSiteViewId = savedSiteViewSelect.value;
   });
@@ -1352,9 +1381,9 @@ function wireReportBuilderEvents(): void {
 }
 
 async function generatePdfReport(): Promise<void> {
-  const activeRun = workspace.reportHistory.find((run) => run.id === selectedResultRunId) ?? workspace.reportHistory[0] ?? null;
-  if (!activeRun) {
-    alert('No results available to generate a report.');
+  const activeRuns = getVisibleResultRuns();
+  if (!activeRuns.length) {
+    alert('No visible runs selected. Check runs in the Results tab first.');
     return;
   }
 
@@ -1400,52 +1429,59 @@ async function generatePdfReport(): Promise<void> {
     }
   };
 
-  writeHeader('RF Ranger Test Report');
-  writeWrapped(`Generated: ${new Date().toLocaleString()}`);
-  writeWrapped(`Result Run Time: ${new Date(activeRun.createdAtIso).toLocaleString()}`);
-  y += 8;
+  for (let runIndex = 0; runIndex < activeRuns.length; runIndex += 1) {
+    const activeRun = activeRuns[runIndex];
+    if (runIndex > 0) {
+      doc.addPage();
+      y = margin;
+    }
 
-  if (categoryEnabled('siteViews')) {
-    writeHeader('Saved Site View');
-    const savedSiteView = workspace.savedSiteViews.find((view) => view.id === selectedSavedSiteViewId) ?? workspace.savedSiteViews[0] ?? null;
-    if (selectedReportTreeIds.has('siteViewTimestamp') && savedSiteView) {
-      writeWrapped(`Capture Time: ${new Date(savedSiteView.createdAtIso).toLocaleString()}`);
-    }
-    if (selectedReportTreeIds.has('siteViewImage') && savedSiteView?.imageDataUrl) {
-      const imageWidth = pageWidth - margin * 2;
-      const imageHeight = Math.min(220, imageWidth * 0.6);
-      if (y + imageHeight > pageHeight - 40) {
-        doc.addPage();
-        y = margin;
-      }
-      const format = savedSiteView.imageDataUrl.includes('image/jpeg') ? 'JPEG' : 'PNG';
-      doc.addImage(savedSiteView.imageDataUrl, format, margin, y, imageWidth, imageHeight);
-      y += imageHeight + 10;
-    } else if (selectedReportTreeIds.has('siteViewImage')) {
-      writeWrapped('No saved site view selected. Save a site view in the Sites tab before generating.');
-    }
+    writeHeader('RF Ranger Test Report');
+    writeWrapped(`Generated: ${new Date().toLocaleString()}`);
+    writeWrapped(`Result Run Time: ${new Date(activeRun.createdAtIso).toLocaleString()}`);
     y += 8;
-  }
 
-  if (categoryEnabled('simulationRuns')) {
-    writeHeader('Simulation Runs');
-    if (!selectedFields.length) {
-      writeWrapped('Simulation Runs category selected, but no simulation fields are selected.');
-    } else {
-      activeRun.rows.forEach((row, index) => {
-        writeWrapped(`Row ${index + 1}`);
-        for (const field of selectedFields) {
-          writeWrapped(`- ${field.label}: ${field.value(row)}`);
+    if (categoryEnabled('siteViews')) {
+      writeHeader('Saved Site View');
+      const savedSiteView = workspace.savedSiteViews.find((view) => view.id === selectedSavedSiteViewId) ?? workspace.savedSiteViews[0] ?? null;
+      if (selectedReportTreeIds.has('siteViewTimestamp') && savedSiteView) {
+        writeWrapped(`Capture Time: ${new Date(savedSiteView.createdAtIso).toLocaleString()}`);
+      }
+      if (selectedReportTreeIds.has('siteViewImage') && savedSiteView?.imageDataUrl) {
+        const imageWidth = pageWidth - margin * 2;
+        const imageHeight = Math.min(220, imageWidth * 0.6);
+        if (y + imageHeight > pageHeight - 40) {
+          doc.addPage();
+          y = margin;
         }
-        y += 6;
-      });
+        const format = savedSiteView.imageDataUrl.includes('image/jpeg') ? 'JPEG' : 'PNG';
+        doc.addImage(savedSiteView.imageDataUrl, format, margin, y, imageWidth, imageHeight);
+        y += imageHeight + 10;
+      } else if (selectedReportTreeIds.has('siteViewImage')) {
+        writeWrapped('No saved site view selected. Save a site view in the Sites tab before generating.');
+      }
+      y += 8;
     }
-  }
 
-  if (categoryEnabled('transmitRadio')) {
-    writeHeader('TX Radio Information');
-    const txRadios = uniqueBy(activeRun.rows.map((row) => row.transmitterRadio));
-    txRadios.forEach((radioName) => {
+    if (categoryEnabled('simulationRuns')) {
+      writeHeader('Simulation Runs');
+      if (!selectedFields.length) {
+        writeWrapped('Simulation Runs category selected, but no simulation fields are selected.');
+      } else {
+        activeRun.rows.forEach((row, index) => {
+          writeWrapped(`Row ${index + 1}`);
+          for (const field of selectedFields) {
+            writeWrapped(`- ${field.label}: ${field.value(row)}`);
+          }
+          y += 6;
+        });
+      }
+    }
+
+    if (categoryEnabled('transmitRadio')) {
+      writeHeader('TX Radio Information');
+      const txRadios = uniqueBy(activeRun.rows.map((row) => row.transmitterRadio));
+      txRadios.forEach((radioName) => {
       const entry = workspace.sources.find((source) => source.name === radioName);
       if (!entry) {
         writeWrapped(`- ${radioName}`);
@@ -1459,114 +1495,115 @@ async function generatePdfReport(): Promise<void> {
       if (selectedReportTreeIds.has('txRadioBandwidth')) lines.push(`Bandwidth: ${(entry.bandwidthHz / 1000).toFixed(3)} kHz`);
       if (selectedReportTreeIds.has('txRadioNoiseFigure')) lines.push(`Noise Figure: ${entry.noiseFigureDb} dB`);
       lines.forEach((line) => writeWrapped(`- ${line}`));
-    });
-  }
-
-  if (categoryEnabled('transmitAntenna')) {
-    writeHeader('TX Antenna Information');
-    const txAntennaIds = uniqueBy(
-      activeRun.rows.map((row) => {
-        const queueItem = workspace.simulationQueue.find((item) => item.id === row.queueItemId);
-        return queueItem?.txAntennaId ?? '';
-      })
-    ).filter(Boolean);
-    if (!txAntennaIds.length) {
-      writeWrapped('No linked TX antenna metadata found for this result run.');
-    } else {
-      txAntennaIds.forEach((antennaId) => {
-        const antenna = workspace.antennas.find((entry) => entry.id === antennaId);
-        if (!antenna) {
-          return;
-        }
-        const lines: string[] = [];
-        if (selectedReportTreeIds.has('txAntennaName')) lines.push(`Name: ${antenna.name}`);
-        if (selectedReportTreeIds.has('txAntennaComments')) lines.push(`Comments: ${antenna.comments || 'None'}`);
-        if (selectedReportTreeIds.has('txAntennaHeight')) lines.push(`Height: ${antenna.heightM} m`);
-        if (selectedReportTreeIds.has('txAntennaAzimuth')) lines.push(`Azimuth: ${antenna.azimuthDeg} deg`);
-        if (selectedReportTreeIds.has('txAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
-        if (selectedReportTreeIds.has('txAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
-        if (selectedReportTreeIds.has('txAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
-        if (selectedReportTreeIds.has('txAntennaGain')) lines.push(`Gain Override: ${antenna.gainOverrideDb ?? 'default'}`);
-        lines.forEach((line) => writeWrapped(`- ${line}`));
       });
     }
-  }
 
-  if (categoryEnabled('propagationModel')) {
-    writeHeader('Propagation Model Information');
-    const modelIds = uniqueBy(
-      activeRun.rows.map((row) => {
-        const queueItem = workspace.simulationQueue.find((item) => item.id === row.queueItemId);
-        return queueItem?.propagationModelId ?? '';
-      })
-    ).filter(Boolean);
-    if (!modelIds.length) {
-      writeWrapped('No linked propagation model metadata found for this result run.');
-    } else {
-      modelIds.forEach((modelId) => {
-        const model = workspace.propagationModels.find((entry) => entry.id === modelId);
-        if (!model) {
-          return;
-        }
-        const lines: string[] = [];
-        if (selectedReportTreeIds.has('propModelName')) lines.push(`Name: ${model.name}`);
-        if (selectedReportTreeIds.has('propModelComments')) lines.push(`Comments: ${model.comments || 'None'}`);
-        if (selectedReportTreeIds.has('propModelType')) lines.push(`Model Type: ${model.modelType}`);
-        if (selectedReportTreeIds.has('propModelParams')) lines.push(`Parameters: ${JSON.stringify(model.parameters)}`);
-        lines.forEach((line) => writeWrapped(`- ${line}`));
-      });
-    }
-  }
-
-  if (categoryEnabled('receiverAntenna')) {
-    writeHeader('RX Antenna Information');
-    const rxAntennaIds = uniqueBy(
-      activeRun.rows.map((row) => {
-        const queueItem = workspace.simulationQueue.find((item) => item.id === row.queueItemId);
-        return queueItem?.rxAntennaId ?? '';
-      })
-    ).filter(Boolean);
-    if (!rxAntennaIds.length) {
-      writeWrapped('No linked RX antenna metadata found for this result run.');
-    } else {
-      rxAntennaIds.forEach((antennaId) => {
-        const antenna = workspace.antennas.find((entry) => entry.id === antennaId);
-        if (!antenna) {
-          return;
-        }
-        const lines: string[] = [];
-        if (selectedReportTreeIds.has('rxAntennaName')) lines.push(`Name: ${antenna.name}`);
-        if (selectedReportTreeIds.has('rxAntennaComments')) lines.push(`Comments: ${antenna.comments || 'None'}`);
-        if (selectedReportTreeIds.has('rxAntennaHeight')) lines.push(`Height: ${antenna.heightM} m`);
-        if (selectedReportTreeIds.has('rxAntennaAzimuth')) lines.push(`Azimuth: ${antenna.azimuthDeg} deg`);
-        if (selectedReportTreeIds.has('rxAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
-        if (selectedReportTreeIds.has('rxAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
-        if (selectedReportTreeIds.has('rxAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
-        if (selectedReportTreeIds.has('rxAntennaGain')) lines.push(`Gain Override: ${antenna.gainOverrideDb ?? 'default'}`);
-        lines.forEach((line) => writeWrapped(`- ${line}`));
-      });
-    }
-  }
-
-  if (categoryEnabled('receiverRadio')) {
-    writeHeader('RX Radio Information');
-    const rxRadios = uniqueBy(activeRun.rows.map((row) => row.receiverRadio));
-    rxRadios.forEach((radioName) => {
-      const entry = workspace.sinks.find((sink) => sink.name === radioName);
-      if (!entry) {
-        writeWrapped(`- ${radioName}`);
-        return;
+    if (categoryEnabled('transmitAntenna')) {
+      writeHeader('TX Antenna Information');
+      const txAntennaIds = uniqueBy(
+        activeRun.rows.map((row) => {
+          const queueItem = workspace.simulationQueue.find((item) => item.id === row.queueItemId);
+          return queueItem?.txAntennaId ?? '';
+        })
+      ).filter(Boolean);
+      if (!txAntennaIds.length) {
+        writeWrapped('No linked TX antenna metadata found for this result run.');
+      } else {
+        txAntennaIds.forEach((antennaId) => {
+          const antenna = workspace.antennas.find((entry) => entry.id === antennaId);
+          if (!antenna) {
+            return;
+          }
+          const lines: string[] = [];
+          if (selectedReportTreeIds.has('txAntennaName')) lines.push(`Name: ${antenna.name}`);
+          if (selectedReportTreeIds.has('txAntennaComments')) lines.push(`Comments: ${antenna.comments || 'None'}`);
+          if (selectedReportTreeIds.has('txAntennaHeight')) lines.push(`Height: ${antenna.heightM} m`);
+          if (selectedReportTreeIds.has('txAntennaAzimuth')) lines.push(`Azimuth: ${antenna.azimuthDeg} deg`);
+          if (selectedReportTreeIds.has('txAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
+          if (selectedReportTreeIds.has('txAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
+          if (selectedReportTreeIds.has('txAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
+          if (selectedReportTreeIds.has('txAntennaGain')) lines.push(`Gain Override: ${antenna.gainOverrideDb ?? 'default'}`);
+          lines.forEach((line) => writeWrapped(`- ${line}`));
+        });
       }
-      const lines: string[] = [];
-      if (selectedReportTreeIds.has('rxRadioName')) lines.push(`Name: ${entry.name}`);
-      if (selectedReportTreeIds.has('rxRadioComments')) lines.push(`Comments: ${entry.comments || 'None'}`);
-      if (selectedReportTreeIds.has('rxRadioFrequency')) lines.push(`Carrier Frequency: ${entry.carrierFrequencyMHz} MHz`);
-      if (selectedReportTreeIds.has('rxRadioBandwidth')) lines.push(`Bandwidth: ${(entry.bandwidthHz / 1000).toFixed(3)} kHz`);
-      if (selectedReportTreeIds.has('rxRadioEnvTemp')) lines.push(`Environment Noise Temperature: ${entry.environmentNoiseTemperatureK} K`);
-      if (selectedReportTreeIds.has('rxRadioNoiseFigure')) lines.push(`Noise Figure: ${entry.noiseFigureDb} dB`);
-      if (selectedReportTreeIds.has('rxRadioRequiredSnr')) lines.push(`Required SNR: ${entry.requiredSnrDb} dB`);
-      lines.forEach((line) => writeWrapped(`- ${line}`));
-    });
+    }
+
+    if (categoryEnabled('propagationModel')) {
+      writeHeader('Propagation Model Information');
+      const modelIds = uniqueBy(
+        activeRun.rows.map((row) => {
+          const queueItem = workspace.simulationQueue.find((item) => item.id === row.queueItemId);
+          return queueItem?.propagationModelId ?? '';
+        })
+      ).filter(Boolean);
+      if (!modelIds.length) {
+        writeWrapped('No linked propagation model metadata found for this result run.');
+      } else {
+        modelIds.forEach((modelId) => {
+          const model = workspace.propagationModels.find((entry) => entry.id === modelId);
+          if (!model) {
+            return;
+          }
+          const lines: string[] = [];
+          if (selectedReportTreeIds.has('propModelName')) lines.push(`Name: ${model.name}`);
+          if (selectedReportTreeIds.has('propModelComments')) lines.push(`Comments: ${model.comments || 'None'}`);
+          if (selectedReportTreeIds.has('propModelType')) lines.push(`Model Type: ${model.modelType}`);
+          if (selectedReportTreeIds.has('propModelParams')) lines.push(`Parameters: ${JSON.stringify(model.parameters)}`);
+          lines.forEach((line) => writeWrapped(`- ${line}`));
+        });
+      }
+    }
+
+    if (categoryEnabled('receiverAntenna')) {
+      writeHeader('RX Antenna Information');
+      const rxAntennaIds = uniqueBy(
+        activeRun.rows.map((row) => {
+          const queueItem = workspace.simulationQueue.find((item) => item.id === row.queueItemId);
+          return queueItem?.rxAntennaId ?? '';
+        })
+      ).filter(Boolean);
+      if (!rxAntennaIds.length) {
+        writeWrapped('No linked RX antenna metadata found for this result run.');
+      } else {
+        rxAntennaIds.forEach((antennaId) => {
+          const antenna = workspace.antennas.find((entry) => entry.id === antennaId);
+          if (!antenna) {
+            return;
+          }
+          const lines: string[] = [];
+          if (selectedReportTreeIds.has('rxAntennaName')) lines.push(`Name: ${antenna.name}`);
+          if (selectedReportTreeIds.has('rxAntennaComments')) lines.push(`Comments: ${antenna.comments || 'None'}`);
+          if (selectedReportTreeIds.has('rxAntennaHeight')) lines.push(`Height: ${antenna.heightM} m`);
+          if (selectedReportTreeIds.has('rxAntennaAzimuth')) lines.push(`Azimuth: ${antenna.azimuthDeg} deg`);
+          if (selectedReportTreeIds.has('rxAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
+          if (selectedReportTreeIds.has('rxAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
+          if (selectedReportTreeIds.has('rxAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
+          if (selectedReportTreeIds.has('rxAntennaGain')) lines.push(`Gain Override: ${antenna.gainOverrideDb ?? 'default'}`);
+          lines.forEach((line) => writeWrapped(`- ${line}`));
+        });
+      }
+    }
+
+    if (categoryEnabled('receiverRadio')) {
+      writeHeader('RX Radio Information');
+      const rxRadios = uniqueBy(activeRun.rows.map((row) => row.receiverRadio));
+      rxRadios.forEach((radioName) => {
+        const entry = workspace.sinks.find((sink) => sink.name === radioName);
+        if (!entry) {
+          writeWrapped(`- ${radioName}`);
+          return;
+        }
+        const lines: string[] = [];
+        if (selectedReportTreeIds.has('rxRadioName')) lines.push(`Name: ${entry.name}`);
+        if (selectedReportTreeIds.has('rxRadioComments')) lines.push(`Comments: ${entry.comments || 'None'}`);
+        if (selectedReportTreeIds.has('rxRadioFrequency')) lines.push(`Carrier Frequency: ${entry.carrierFrequencyMHz} MHz`);
+        if (selectedReportTreeIds.has('rxRadioBandwidth')) lines.push(`Bandwidth: ${(entry.bandwidthHz / 1000).toFixed(3)} kHz`);
+        if (selectedReportTreeIds.has('rxRadioEnvTemp')) lines.push(`Environment Noise Temperature: ${entry.environmentNoiseTemperatureK} K`);
+        if (selectedReportTreeIds.has('rxRadioNoiseFigure')) lines.push(`Noise Figure: ${entry.noiseFigureDb} dB`);
+        if (selectedReportTreeIds.has('rxRadioRequiredSnr')) lines.push(`Required SNR: ${entry.requiredSnrDb} dB`);
+        lines.forEach((line) => writeWrapped(`- ${line}`));
+      });
+    }
   }
 
   const stamp = new Date().toISOString().replaceAll(':', '-');
@@ -1675,6 +1712,7 @@ async function runSimulationQueue(): Promise<void> {
       workspace.reportLatest = event.data.rows;
       workspace.reportHistory.unshift(resultRun);
       selectedResultRunId = resultRun.id;
+      visibleResultRunIds.add(resultRun.id);
       await saveWorkspace(workspace);
       progress = { running: false, completed: event.data.rows.length, total: event.data.rows.length, message: 'Complete' };
       worker.terminate();
@@ -2326,6 +2364,10 @@ function ensureSelectionDefaults(): void {
   if (!workspace.reportHistory.some((entry) => entry.id === selectedResultRunId)) {
     selectedResultRunId = workspace.reportHistory[0]?.id ?? '';
   }
+  visibleResultRunIds = new Set(Array.from(visibleResultRunIds).filter((id) => workspace.reportHistory.some((run) => run.id === id)));
+  if (!visibleResultRunIds.size && workspace.reportHistory.length) {
+    visibleResultRunIds.add(workspace.reportHistory[0].id);
+  }
   if (!workspace.savedSiteViews.some((entry) => entry.id === selectedSavedSiteViewId)) {
     selectedSavedSiteViewId = workspace.savedSiteViews[0]?.id ?? '';
   }
@@ -2388,6 +2430,17 @@ function formatDistance(km: number): string {
     default:
       return `${km.toFixed(3)} km`;
   }
+}
+
+function getVisibleResultRuns(): ResultRun[] {
+  const visible = workspace.reportHistory.filter((run) => visibleResultRunIds.has(run.id));
+  if (visible.length) {
+    return visible;
+  }
+  if (workspace.reportHistory.length) {
+    return [workspace.reportHistory[0]];
+  }
+  return [];
 }
 
 function renderManualWithToc(markdown: string): { tocHtml: string; bodyHtml: string } {
