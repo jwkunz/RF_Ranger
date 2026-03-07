@@ -104,11 +104,6 @@ export interface SimulationResultRow {
   receiverSiteName: string;
   receiverCoordinates: string;
   receiverRadio: string;
-  transmitterSiteComments: string;
-  transmitterRadioComments: string;
-  propagationModelComments: string;
-  receiverSiteComments: string;
-  receiverRadioComments: string;
   sourceName: string;
   sinkName: string;
   transmitterEirpDensityDbmPerHz: number;
@@ -121,6 +116,12 @@ export interface SimulationResultRow {
   snrDb: number;
   usableLink: 'Y' | 'N';
   warnings: string[];
+}
+
+export interface ResultRun {
+  id: string;
+  createdAtIso: string;
+  rows: SimulationResultRow[];
 }
 
 export interface Preferences {
@@ -139,4 +140,5 @@ export interface WorkspaceSnapshot {
   simulationQueue: SimulationQueueItem[];
   preferences: Preferences;
   reportLatest: SimulationResultRow[];
+  reportHistory: ResultRun[];
 }

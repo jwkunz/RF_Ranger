@@ -13,5 +13,6 @@ export const DEFAULT_WORKSPACE: WorkspaceSnapshot = {
     powerUnit: 'dBm',
     distanceUnit: 'km'
   },
-  reportLatest: []
+  reportLatest: [],
+  reportHistory: []
 };

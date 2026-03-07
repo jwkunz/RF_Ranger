@@ -89,11 +89,6 @@ export function exportReportsCsv(rows: SimulationResultRow[]): void {
     'Receiver Site Name',
     'Receiver Coordinates',
     'Receiver Radio',
-    'Transmitter Site Comments',
-    'Transmitter Radio Comments',
-    'Propagation Model Comments',
-    'Receiver Site Comments',
-    'Receiver Radio Comments',
     'Transmitter EIRP Density',
     'Distance',
     'Propagation Losses',
@@ -114,11 +109,6 @@ export function exportReportsCsv(rows: SimulationResultRow[]): void {
       row.receiverSiteName,
       row.receiverCoordinates,
       row.receiverRadio,
-      row.transmitterSiteComments,
-      row.transmitterRadioComments,
-      row.propagationModelComments,
-      row.receiverSiteComments,
-      row.receiverRadioComments,
       row.transmitterEirpDensityDbmPerHz.toString(),
       row.distanceKm.toString(),
       row.propagationLossesDb.toString(),
@@ -138,7 +128,7 @@ export function exportReportsCsv(rows: SimulationResultRow[]): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = 'rf-ranger-reports.csv';
+  anchor.download = 'rf-ranger-results.csv';
   anchor.click();
   URL.revokeObjectURL(url);
 }

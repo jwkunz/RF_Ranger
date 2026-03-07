@@ -9,7 +9,7 @@ On launch, RF Ranger displays a splash screen with project branding and legal no
 - **Antennas**: Manage antenna models.
 - **Propagation Models**: Manage model presets.
 - **Simulation**: Build queue entries (TX site/radio, propagation model, RX site/radio) and launch simulations.
-- **Reports**: View latest simulation queue results and export CSV.
+- **Results**: View buffered simulation results, select/remove runs, and export CSV.
 - **Preferences**: Change theme and units.
 - **Help**: Read this manual.
 - **Legal**: Review licenses, dependencies, and remote-communication disclosures.
@@ -21,7 +21,7 @@ On launch, RF Ranger displays a splash screen with project branding and legal no
 4. Define sites in Sites by map click, coordinates, or geocoding.
 5. In Simulation, add one or more queue rows selecting TX site/source radio/propagation model/RX site/receiver radio.
 6. Launch Simulations.
-6. Review output in Reports and export CSV if needed.
+6. Review output in Results and export CSV if needed.
 
 ## 4. Data Management
 - State is auto-saved to browser IndexedDB.

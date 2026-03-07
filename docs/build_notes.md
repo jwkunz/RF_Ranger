@@ -401,3 +401,19 @@
 - Known Issues / Next Focus:
   - Antenna comments are now stored but not yet tied to per-run report rows because antenna selection is not currently part of the simulation queue model.
 - Commit: this commit (`milestone(M30): sites ux and entity comments in reports v0.31.0`)
+
+## M31 - Results Tab Buffering + Report Comment Rollback
+- Date: 2026-03-07
+- Version: 0.32.0
+- Completed:
+  - Removed entity comment columns from result output table and CSV export.
+  - Renamed top tab label from `Reports` to `Results`.
+  - Added buffered result-run history in workspace state instead of overwriting prior runs.
+  - Results tab now shows active run table at top and buffered run queue at bottom.
+  - Added per-run actions: `View`, `Remove`, and global `Clear All`.
+  - Updated simulation completion flow to append new runs to result history and auto-select newest run.
+  - Added backward-compatible migration from legacy `reportLatest`-only data to buffered result history.
+  - Updated user docs terminology from Reports to Results.
+- Known Issues / Next Focus:
+  - Optional: add result-run naming/tagging and search/filter for large histories.
+- Commit: this commit (`milestone(M31): results buffering and report comment rollback v0.32.0`)

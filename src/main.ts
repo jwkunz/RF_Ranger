@@ -20,6 +20,7 @@ import type {
   PropagationModelType,
   RadioSink,
   RadioSource,
+  ResultRun,
   SimulationQueueItem,
   SimulationResultRow,
   Site,
@@ -34,7 +35,7 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'propagation', label: 'Propagation Models' },
   { id: 'sites', label: 'Sites' },
   { id: 'simulation', label: 'Simulation' },
-  { id: 'reports', label: 'Reports' },
+  { id: 'reports', label: 'Results' },
   { id: 'preferences', label: 'Preferences' },
   { id: 'help', label: 'Help' },
   { id: 'legal', label: 'Legal' }
@@ -179,6 +180,7 @@ let mapPaneWidthPx: number | null = null;
 let sitePaneWidthPx: number | null = null;
 let progress: ProgressState = { running: false, completed: 0, total: 0, message: 'Idle' };
 let focusedReportQueueItemId = '';
+let selectedResultRunId = '';
 
 const app = requireAppRoot();
 
@@ -406,7 +408,8 @@ function renderSimulationTab(): string {
 }
 
 function renderReportsTab(): string {
-  const rows = workspace.reportLatest
+  const selectedRun = workspace.reportHistory.find((run) => run.id === selectedResultRunId) ?? workspace.reportHistory[0] ?? null;
+  const rows = (selectedRun?.rows ?? workspace.reportLatest)
     .map((row) => {
       const highlighted = row.queueItemId === focusedReportQueueItemId ? ' class="focus-row"' : '';
       return `<tr${highlighted}>
@@ -418,11 +421,6 @@ function renderReportsTab(): string {
         <td>${escapeHtml(row.receiverSiteName)}</td>
         <td>${escapeHtml(row.receiverCoordinates)}</td>
         <td>${escapeHtml(row.receiverRadio)}</td>
-        <td>${escapeHtml(row.transmitterSiteComments)}</td>
-        <td>${escapeHtml(row.transmitterRadioComments)}</td>
-        <td>${escapeHtml(row.propagationModelComments)}</td>
-        <td>${escapeHtml(row.receiverSiteComments)}</td>
-        <td>${escapeHtml(row.receiverRadioComments)}</td>
         <td>${formatPowerDensity(row.transmitterEirpDensityDbmPerHz)}</td>
         <td>${formatDistance(row.distanceKm)}</td>
         <td>${row.propagationLossesDb.toFixed(2)} dB</td>
@@ -438,8 +436,24 @@ function renderReportsTab(): string {
     })
     .join('');
 
+  const runRows = workspace.reportHistory
+    .map((run, index) => {
+      const selectedClass = run.id === selectedRun?.id ? ' class="focus-row"' : '';
+      const stamp = new Date(run.createdAtIso).toLocaleString();
+      return `<tr${selectedClass}>
+        <td>${index + 1}</td>
+        <td>${escapeHtml(stamp)}</td>
+        <td>${run.rows.length}</td>
+        <td>
+          <button data-select-result-run="${run.id}">View</button>
+          <button data-delete-result-run="${run.id}">Remove</button>
+        </td>
+      </tr>`;
+    })
+    .join('');
+
   return `
-    <h2>Reports</h2>
+    <h2>Results</h2>
     <section class="panel">
       <div class="action-row">
         <button id="export-csv">Export CSV</button>
@@ -455,11 +469,6 @@ function renderReportsTab(): string {
             <th>Receiver Site Name</th>
             <th>Receiver Coordinates</th>
             <th>Receiver Radio</th>
-            <th>Transmitter Site Comments</th>
-            <th>Transmitter Radio Comments</th>
-            <th>Propagation Model Comments</th>
-            <th>Receiver Site Comments</th>
-            <th>Receiver Radio Comments</th>
             <th>Transmitter EIRP Density</th>
             <th>Distance</th>
             <th>Propagation Losses</th>
@@ -473,7 +482,17 @@ function renderReportsTab(): string {
             <th>Jump</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="24">No report data. Launch simulations from the Simulation tab.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="19">No result data. Launch simulations from the Simulation tab.</td></tr>'}</tbody>
+      </table>
+    </section>
+    <section class="panel">
+      <div class="action-row">
+        <h3>Buffered Results Queue</h3>
+        <button id="clear-all-results" ${workspace.reportHistory.length ? '' : 'disabled'}>Clear All</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Run Time</th><th>Rows</th><th>Actions</th></tr></thead>
+        <tbody>${runRows || '<tr><td colspan="4">No buffered results yet.</td></tr>'}</tbody>
       </table>
     </section>
   `;
@@ -919,8 +938,11 @@ function wireSimulationEvents(): void {
 }
 
 function wireReportsEvents(): void {
+  const selectedRun = workspace.reportHistory.find((run) => run.id === selectedResultRunId) ?? workspace.reportHistory[0] ?? null;
+  const rows = selectedRun?.rows ?? workspace.reportLatest;
+
   document.querySelector<HTMLButtonElement>('#export-csv')?.addEventListener('click', () => {
-    exportReportsCsv(workspace.reportLatest);
+    exportReportsCsv(rows);
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-jump-site]').forEach((button) => {
@@ -934,6 +956,34 @@ function wireReportsEvents(): void {
         map.flyTo({ center: [site.longitude, site.latitude], zoom: 13 });
       }
     });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-select-result-run]').forEach((button) => {
+    button.addEventListener('click', () => {
+      selectedResultRunId = button.dataset.selectResultRun ?? '';
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-delete-result-run]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const id = button.dataset.deleteResultRun ?? '';
+      workspace.reportHistory = workspace.reportHistory.filter((run) => run.id !== id);
+      if (selectedResultRunId === id) {
+        selectedResultRunId = workspace.reportHistory[0]?.id ?? '';
+      }
+      workspace.reportLatest = workspace.reportHistory[0]?.rows ?? [];
+      await saveWorkspace(workspace);
+      render();
+    });
+  });
+
+  document.querySelector<HTMLButtonElement>('#clear-all-results')?.addEventListener('click', async () => {
+    workspace.reportHistory = [];
+    workspace.reportLatest = [];
+    selectedResultRunId = '';
+    await saveWorkspace(workspace);
+    render();
   });
 }
 
@@ -1011,7 +1061,14 @@ async function runSimulationQueue(): Promise<void> {
     }
 
     if (event.data.type === 'complete') {
+      const resultRun: ResultRun = {
+        id: uid(),
+        createdAtIso: new Date().toISOString(),
+        rows: event.data.rows
+      };
       workspace.reportLatest = event.data.rows;
+      workspace.reportHistory.unshift(resultRun);
+      selectedResultRunId = resultRun.id;
       await saveWorkspace(workspace);
       progress = { running: false, completed: event.data.rows.length, total: event.data.rows.length, message: 'Complete' };
       worker.terminate();
@@ -1504,6 +1561,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     }>;
     simulationQueue?: SimulationQueueItem[];
     preferences?: WorkspaceSnapshot['preferences'];
+    reportHistory?: Array<{ id?: string; createdAtIso?: string; rows?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }> }>;
     reportLatest?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }>;
   };
 
@@ -1560,7 +1618,8 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
       }));
   }
 
-  const reportLatest = (work.reportLatest ?? []).map((row) => ({
+  const normalizeResultRows = (rows: Array<Partial<SimulationResultRow> & { sinkPinId?: string }>): SimulationResultRow[] =>
+    rows.map((row) => ({
     queueItemId: row.queueItemId ?? row.sinkPinId ?? '',
     txSiteId: row.txSiteId ?? '',
     rxSiteId: row.rxSiteId ?? '',
@@ -1572,11 +1631,6 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     receiverSiteName: row.receiverSiteName ?? row.sinkName ?? 'Unknown RX Site',
     receiverCoordinates: row.receiverCoordinates ?? '',
     receiverRadio: row.receiverRadio ?? 'Unknown RX Radio',
-    transmitterSiteComments: row.transmitterSiteComments ?? '',
-    transmitterRadioComments: row.transmitterRadioComments ?? '',
-    propagationModelComments: row.propagationModelComments ?? '',
-    receiverSiteComments: row.receiverSiteComments ?? '',
-    receiverRadioComments: row.receiverRadioComments ?? '',
     sourceName: row.sourceName ?? 'Unknown Source',
     sinkName: row.sinkName ?? 'Unknown Sink',
     transmitterEirpDensityDbmPerHz: row.transmitterEirpDensityDbmPerHz ?? 0,
@@ -1589,7 +1643,23 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     snrDb: row.snrDb ?? 0,
     usableLink: row.usableLink === 'Y' ? ('Y' as const) : ('N' as const),
     warnings: row.warnings ?? []
-  }));
+    }));
+
+  const reportLatest = normalizeResultRows(work.reportLatest ?? []);
+  const reportHistory: ResultRun[] =
+    work.reportHistory?.map((run) => ({
+      id: run.id ?? uid(),
+      createdAtIso: run.createdAtIso ?? new Date().toISOString(),
+      rows: normalizeResultRows(run.rows ?? [])
+    })) ?? [];
+
+  if (!reportHistory.length && reportLatest.length) {
+    reportHistory.push({
+      id: uid(),
+      createdAtIso: new Date().toISOString(),
+      rows: reportLatest
+    });
+  }
 
   return {
     schemaVersion: 1,
@@ -1600,7 +1670,8 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     sites,
     simulationQueue: work.simulationQueue ?? [],
     preferences,
-    reportLatest
+    reportLatest,
+    reportHistory
   };
 }
 
@@ -1622,6 +1693,9 @@ function ensureSelectionDefaults(): void {
   }
   if (!workspace.propagationModels.some((entry) => entry.id === selectedPropagationModelId)) {
     selectedPropagationModelId = workspace.propagationModels[0]?.id ?? '';
+  }
+  if (!workspace.reportHistory.some((entry) => entry.id === selectedResultRunId)) {
+    selectedResultRunId = workspace.reportHistory[0]?.id ?? '';
   }
 }
 
