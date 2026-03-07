@@ -2,9 +2,13 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibregl from 'maplibre-gl';
 import SimulationWorker from './simulationWorker?worker&inline';
 import './styles.css';
+import 'katex/dist/katex.min.css';
 import legalMarkdown from '../docs/LEGAL.md?raw';
 import manualMarkdown from '../docs/Manual.md?raw';
 import modelsMarkdown from '../docs/Models.md?raw';
+import MarkdownIt from 'markdown-it';
+import texmath from 'markdown-it-texmath';
+import katex from 'katex';
 import { DEFAULT_WORKSPACE } from './defaults';
 import { exportReportsCsv, exportSitesKml, exportWorkspaceJson, parseSitesKml, parseWorkspaceJson } from './io';
 import { loadWorkspace, saveWorkspace } from './storage';
@@ -46,6 +50,12 @@ const propagationParameterDefaults: Record<PropagationModelType, Record<string, 
   'Effective Earth Radius': { kFactor: 1.333333, txHeightM: 20, rxHeightM: 5 },
   Troposcatter: { constantA: 120 }
 };
+
+const modelGuideMarkdown = new MarkdownIt({ html: false, linkify: true, typographer: false }).use(texmath, {
+  engine: katex,
+  delimiters: 'dollars',
+  katexOptions: { throwOnError: false, strict: 'ignore' }
+});
 
 interface ProgressState {
   running: boolean;
@@ -557,7 +567,7 @@ function renderPropagationTab(): string {
     )
     .join('');
 
-  const setupGuide = renderMarkdownSection(extractPropagationModelSection(activePropagationType, modelsMarkdown));
+  const setupGuide = renderModelGuideHtml(extractPropagationModelSection(activePropagationType, modelsMarkdown));
 
   return `
     <h2>Propagation Models</h2>
@@ -1571,6 +1581,11 @@ function renderManualWithToc(markdown: string): { tocHtml: string; bodyHtml: str
 
 function renderMarkdownSection(markdown: string): string {
   return renderManualWithToc(markdown).bodyHtml;
+}
+
+function renderModelGuideHtml(markdown: string): string {
+  const normalized = markdown.replace(/\n\[\n([\s\S]*?)\n\]\n/g, (_match, body: string) => `\n\n$$\n${body.trim()}\n$$\n\n`);
+  return modelGuideMarkdown.render(normalized);
 }
 
 function extractPropagationModelSection(modelType: PropagationModelType, markdown: string): string {

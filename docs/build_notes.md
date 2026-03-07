@@ -328,3 +328,16 @@
 - Known Issues / Next Focus:
   - Table/math markdown in the guidance content is currently displayed as plain text lines; optional future enhancement is richer markdown rendering.
 - Commit: this commit (`milestone(M24): propagation model setup guidance pane v0.25.0`)
+
+## M25 - Propagation Guide Markdown + LaTeX Rendering
+- Date: 2026-03-07
+- Version: 0.26.0
+- Completed:
+  - Added markdown rendering engine for propagation model setup guidance content.
+  - Added LaTeX math rendering support in the propagation guide pane using KaTeX.
+  - Normalized bracket-style display-math blocks from `docs/Models.md` into renderable math delimiters.
+  - Included KaTeX stylesheet in app bundle for proper equation formatting.
+  - Added required package type support for strict TypeScript checks.
+- Known Issues / Next Focus:
+  - Single-file output size increased significantly due to bundled markdown/math rendering dependencies.
+- Commit: this commit (`milestone(M25): render propagation guide markdown+latex v0.26.0`)
