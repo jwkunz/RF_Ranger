@@ -498,3 +498,14 @@
 - Known Issues / Next Focus:
   - Very large visible run sets can produce large PDFs; optional future enhancement is per-page row limits/tables.
 - Commit: this commit (`milestone(M36): visible-run results and report pagination v0.37.0`)
+
+## M37 - Exact Site View Snapshot Capture
+- Date: 2026-03-07
+- Version: 0.38.0
+- Completed:
+  - Replaced map snapshot capture path with DOM-level capture of the map container to include overlays.
+  - Saved Site View captures now include on-screen markers/pins and any visible popup/tooltips.
+  - Added `html2canvas` dependency for reliable viewport screenshot capture.
+- Known Issues / Next Focus:
+  - If no tooltip/popup is currently visible on screen at capture time, it will not appear in the saved snapshot (WYSIWYG behavior).
+- Commit: this commit (`milestone(M37): exact site view capture with overlays v0.38.0`)

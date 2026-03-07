@@ -10,6 +10,7 @@ import MarkdownIt from 'markdown-it';
 import texmath from 'markdown-it-texmath';
 import katex from 'katex';
 import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { DEFAULT_WORKSPACE } from './defaults';
 import { exportReportsCsv, exportSitesKml, exportWorkspaceJson, parseSitesKml, parseWorkspaceJson } from './io';
 import { loadWorkspace, saveWorkspace } from './storage';
@@ -1123,7 +1124,7 @@ function wireSitesEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('#save-site-view')?.addEventListener('click', async () => {
-    const imageDataUrl = captureMapSnapshot();
+    const imageDataUrl = await captureMapSnapshot();
     if (!imageDataUrl) {
       alert('Map snapshot unavailable. Ensure the Sites map is loaded before saving a view.');
       return;
@@ -1610,13 +1611,19 @@ async function generatePdfReport(): Promise<void> {
   doc.save(`rf-ranger-report-${stamp}.pdf`);
 }
 
-function captureMapSnapshot(): string | null {
-  if (!map) {
+async function captureMapSnapshot(): Promise<string | null> {
+  const container = document.querySelector<HTMLElement>('#map-canvas');
+  if (!container) {
     return null;
   }
   try {
-    const canvas = map.getCanvas();
-    return canvas.toDataURL('image/jpeg', 0.9);
+    const canvas = await html2canvas(container, {
+      useCORS: true,
+      backgroundColor: null,
+      logging: false,
+      scale: 1
+    });
+    return canvas.toDataURL('image/jpeg', 0.92);
   } catch {
     return null;
   }
