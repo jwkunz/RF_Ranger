@@ -269,6 +269,16 @@ fieldset.param-grid {
   color: var(--muted);
 }
 
+.site-color-chip {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 999px;
+  margin-right: 0.5rem;
+  border: 1px solid #94a3b8;
+  vertical-align: middle;
+}
+
 @media (max-width: 1000px) {
   .map-layout {
     grid-template-columns: 1fr;
@@ -288,6 +298,37 @@ fieldset.param-grid {
   display: grid;
   gap: 0.25rem;
   font-size: 0.9rem;
+}
+
+.simulation-section {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.sim-columns {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  align-items: end;
+}
+
+.sim-columns--header {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.sim-columns--queue {
+  border-top: 1px solid #94a3b8;
+  padding-top: 0.5rem;
+}
+
+.sim-columns label {
+  margin: 0;
+}
+
+.sim-columns > div {
+  min-width: 0;
 }
 
 progress {
@@ -351,5 +392,9 @@ progress {
     border-right: none;
     border-bottom: 1px solid #94a3b8;
     padding-bottom: 0.8rem;
+  }
+
+  .sim-columns {
+    grid-template-columns: 1fr;
   }
 }

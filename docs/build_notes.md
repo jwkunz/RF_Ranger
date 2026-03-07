@@ -279,3 +279,19 @@
 - Known Issues / Next Focus:
   - Optional: add explicit units in table headers (e.g. `dBm/Hz`) for every density field.
 - Commit: this commit (`milestone(M21): spectral-density simulation/report v0.22.0`)
+
+## M22 - Sites/Simulation Queue Refactor
+- Date: 2026-03-07
+- Version: 0.23.0
+- Completed:
+  - Refactored `Map View` into `Sites` tab with site-only scope (name, coordinates, pin color).
+  - Added site list below map and right-side site property editor driven by selected site.
+  - Updated map interactions to populate coordinates on click and support geocode + add/update flows.
+  - Switched KML import/export from pin schema to site schema.
+  - Reworked Simulation tab into five-column definition + queued runs with `Add to Simulation Queue` and `Launch Simulations`.
+  - Updated worker execution model to batch-run queued simulations and report progress/results per queue item.
+  - Updated Reports jump actions to navigate back to receiver site in Sites tab.
+  - Added workspace migration logic to convert legacy `pins` data to `sites` for existing stored workspaces.
+- Known Issues / Next Focus:
+  - Antenna models are currently not explicitly selected per queue row; consider adding per-row TX/RX antenna binding in a future milestone.
+- Commit: this commit (`milestone(M22): sites and queued simulations refactor v0.23.0`)

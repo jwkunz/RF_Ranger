@@ -6,7 +6,8 @@ export const DEFAULT_WORKSPACE: WorkspaceSnapshot = {
   sinks: [],
   antennas: [],
   propagationModels: [],
-  pins: [],
+  sites: [],
+  simulationQueue: [],
   preferences: {
     theme: 'dark',
     powerUnit: 'dBm',

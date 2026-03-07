@@ -1,4 +1,4 @@
-import type { MapPin, SimulationResultRow, WorkspaceSnapshot } from './types';
+import type { SimulationResultRow, Site, WorkspaceSnapshot } from './types';
 
 export function exportWorkspaceJson(workspace: WorkspaceSnapshot): void {
   const json = JSON.stringify(workspace, null, 2);
@@ -20,18 +20,16 @@ export async function parseWorkspaceJson(file: File): Promise<WorkspaceSnapshot>
   return parsed;
 }
 
-export function exportPinsKml(pins: MapPin[]): void {
-  const placemarks = pins
+export function exportSitesKml(sites: Site[]): void {
+  const placemarks = sites
     .map(
-      (pin) => `
+      (site) => `
     <Placemark>
-      <name>${escapeXml(pin.name)}</name>
+      <name>${escapeXml(site.name)}</name>
       <ExtendedData>
-        <Data name="pinType"><value>${escapeXml(pin.kind)}</value></Data>
-        <Data name="radioId"><value>${escapeXml(pin.radioId)}</value></Data>
-        <Data name="antennaId"><value>${escapeXml(pin.antennaId)}</value></Data>
+        <Data name="pinColor"><value>${escapeXml(site.pinColor)}</value></Data>
       </ExtendedData>
-      <Point><coordinates>${pin.longitude},${pin.latitude},0</coordinates></Point>
+      <Point><coordinates>${site.longitude},${site.latitude},0</coordinates></Point>
     </Placemark>`
     )
     .join('');
@@ -46,35 +44,38 @@ export function exportPinsKml(pins: MapPin[]): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = 'rf-ranger-pins.kml';
+  anchor.download = 'rf-ranger-sites.kml';
   anchor.click();
   URL.revokeObjectURL(url);
 }
 
-export async function parsePinsKml(file: File): Promise<MapPin[]> {
+export async function parseSitesKml(file: File): Promise<Site[]> {
   const raw = await file.text();
   const parser = new DOMParser();
   const doc = parser.parseFromString(raw, 'text/xml');
   const placemarks = Array.from(doc.getElementsByTagName('Placemark'));
 
-  return placemarks.map((placemark, index) => {
-    const name = placemark.getElementsByTagName('name')[0]?.textContent?.trim() || `Imported Sink ${index + 1}`;
-    const coordsRaw = placemark.getElementsByTagName('coordinates')[0]?.textContent?.trim() || '';
-    const [lonRaw, latRaw] = coordsRaw.split(',');
-    const pinType = findExtendedDataValue(placemark, 'pinType') || 'sink';
-    const radioId = findExtendedDataValue(placemark, 'radioId') || findExtendedDataValue(placemark, 'sinkRadioId') || '';
-    const antennaId = findExtendedDataValue(placemark, 'antennaId') || findExtendedDataValue(placemark, 'sinkAntennaId') || '';
+  return placemarks
+    .map((placemark, index): Site | null => {
+      const name = placemark.getElementsByTagName('name')[0]?.textContent?.trim() || `Imported Site ${index + 1}`;
+      const coordsRaw = placemark.getElementsByTagName('coordinates')[0]?.textContent?.trim() || '';
+      const [lonRaw, latRaw] = coordsRaw.split(',');
+      const latitude = Number.parseFloat(latRaw);
+      const longitude = Number.parseFloat(lonRaw);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        return null;
+      }
 
-    return {
-      id: crypto.randomUUID(),
-      name,
-      latitude: Number.parseFloat(latRaw),
-      longitude: Number.parseFloat(lonRaw),
-      kind: pinType === 'source' ? 'source' : 'sink',
-      radioId,
-      antennaId
-    };
-  });
+      const site: Site = {
+        id: crypto.randomUUID(),
+        name,
+        latitude,
+        longitude,
+        pinColor: findExtendedDataValue(placemark, 'pinColor') || '#2563eb'
+      };
+      return site;
+    })
+    .filter((site): site is Site => site !== null);
 }
 
 export function exportReportsCsv(rows: SimulationResultRow[]): void {

@@ -1,6 +1,6 @@
 export type TabId =
   | 'welcome'
-  | 'map'
+  | 'sites'
   | 'simulation'
   | 'radios'
   | 'antennas'
@@ -70,18 +70,27 @@ export interface PropagationModel {
   parameters: Record<string, number>;
 }
 
-export interface MapPin {
+export interface Site {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
-  kind: 'source' | 'sink';
-  radioId: string;
-  antennaId: string;
+  pinColor: string;
+}
+
+export interface SimulationQueueItem {
+  id: string;
+  txSiteId: string;
+  sourceRadioId: string;
+  propagationModelId: string;
+  rxSiteId: string;
+  receiverRadioId: string;
 }
 
 export interface SimulationResultRow {
-  sinkPinId: string;
+  queueItemId: string;
+  txSiteId: string;
+  rxSiteId: string;
   sourceName: string;
   sinkName: string;
   transmitterEirpDensityDbmPerHz: number;
@@ -108,7 +117,8 @@ export interface WorkspaceSnapshot {
   sinks: RadioSink[];
   antennas: AntennaModel[];
   propagationModels: PropagationModel[];
-  pins: MapPin[];
+  sites: Site[];
+  simulationQueue: SimulationQueueItem[];
   preferences: Preferences;
   reportLatest: SimulationResultRow[];
 }

@@ -1,14 +1,16 @@
-import type { AntennaModel, MapPin, PropagationModel, RadioSink, RadioSource, SimulationResultRow } from './types';
+import type { PropagationModel, RadioSink, RadioSource, SimulationResultRow, Site } from './types';
+
+interface QueueSimulationInputItem {
+  queueItemId: string;
+  txSite: Site;
+  sourceRadio: RadioSource;
+  propagationModel: PropagationModel;
+  rxSite: Site;
+  receiverRadio: RadioSink;
+}
 
 interface SimulationInput {
-  sourceLabel: string;
-  source: RadioSource;
-  txAntenna: AntennaModel;
-  fallbackRxAntenna: AntennaModel;
-  propagationModel: PropagationModel;
-  sinks: Array<{ pin: MapPin; sink: RadioSink; sinkAntenna: AntennaModel | null }>;
-  txLatitude: number;
-  txLongitude: number;
+  items: QueueSimulationInputItem[];
 }
 
 interface ProgressMessage {
@@ -31,49 +33,46 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
   try {
     const input = event.data;
     const rows: SimulationResultRow[] = [];
-    const total = input.sinks.length;
+    const total = input.items.length;
 
     for (let i = 0; i < total; i += 1) {
-      const sinkDef = input.sinks[i];
-      const rxAntenna = sinkDef.sinkAntenna ?? input.fallbackRxAntenna;
-
-      const distanceKm = haversineKm(input.txLatitude, input.txLongitude, sinkDef.pin.latitude, sinkDef.pin.longitude);
-      const frequencyMHz = input.source.carrierFrequencyMHz;
-      const txGain = antennaGainDb(input.txAntenna);
-      const rxGain = antennaGainDb(rxAntenna);
+      const item = input.items[i];
+      const distanceKm = haversineKm(item.txSite.latitude, item.txSite.longitude, item.rxSite.latitude, item.rxSite.longitude);
+      const frequencyMHz = item.sourceRadio.carrierFrequencyMHz;
 
       const baseFsplDb = 20 * Math.log10(Math.max(distanceKm, 0.001)) + 20 * Math.log10(Math.max(frequencyMHz, 0.001)) + 32.44;
-      const extraLossDb = modelLossAdjustmentDb(input.propagationModel, distanceKm, frequencyMHz);
+      const extraLossDb = modelLossAdjustmentDb(item.propagationModel, distanceKm, frequencyMHz);
       const totalPathLossDb = baseFsplDb + extraLossDb;
-      const txPowerDensityDbmPerHz = input.source.txPowerDbm - 10 * Math.log10(Math.max(input.source.bandwidthHz, 1));
-      const transmitterEirpDensityDbmPerHz = txPowerDensityDbmPerHz + txGain;
+
+      const txPowerDensityDbmPerHz = item.sourceRadio.txPowerDbm - 10 * Math.log10(Math.max(item.sourceRadio.bandwidthHz, 1));
+      const transmitterEirpDensityDbmPerHz = txPowerDensityDbmPerHz;
 
       const incidentRfPowerDensityDbmPerHz = transmitterEirpDensityDbmPerHz - totalPathLossDb;
-      const availablePowerDensityAtAntennaDbmPerHz = incidentRfPowerDensityDbmPerHz + rxGain;
+      const availablePowerDensityAtAntennaDbmPerHz = incidentRfPowerDensityDbmPerHz;
 
       const receiverNoiseFloorDensityDbmPerHz = thermalNoiseDensityDbmPerHz(
-        sinkDef.sink.environmentNoiseTemperatureK ?? 300,
-        sinkDef.sink.noiseFigureDb ?? 10
+        item.receiverRadio.environmentNoiseTemperatureK ?? 300,
+        item.receiverRadio.noiseFigureDb ?? 10
       );
       const snrDb = availablePowerDensityAtAntennaDbmPerHz - receiverNoiseFloorDensityDbmPerHz;
-      const thresholdDbmPerHz = receiverNoiseFloorDensityDbmPerHz + (sinkDef.sink.requiredSnrDb ?? 15);
-
+      const thresholdDbmPerHz = receiverNoiseFloorDensityDbmPerHz + (item.receiverRadio.requiredSnrDb ?? 15);
       const usable = availablePowerDensityAtAntennaDbmPerHz >= thresholdDbmPerHz ? 'Y' : 'N';
 
       const warnings: string[] = [];
-      if (Math.abs(sinkDef.sink.carrierFrequencyMHz - input.source.carrierFrequencyMHz) > 0.001) {
+      if (Math.abs(item.receiverRadio.carrierFrequencyMHz - item.sourceRadio.carrierFrequencyMHz) > 0.001) {
         warnings.push('Frequency mismatch between source and sink');
       }
 
-      const txPowerWatts = dbmToWatts(input.source.txPowerDbm);
-      const effectiveTxLinear = txPowerWatts * Math.pow(10, txGain / 10);
+      const txPowerWatts = dbmToWatts(item.sourceRadio.txPowerDbm);
       const distanceMeters = Math.max(distanceKm * 1000, 1);
-      const incidentElectricFieldVm = Math.sqrt((30 * effectiveTxLinear) / (distanceMeters * distanceMeters));
+      const incidentElectricFieldVm = Math.sqrt((30 * txPowerWatts) / (distanceMeters * distanceMeters));
 
       rows.push({
-        sinkPinId: sinkDef.pin.id,
-        sourceName: input.sourceLabel,
-        sinkName: sinkDef.pin.name,
+        queueItemId: item.queueItemId,
+        txSiteId: item.txSite.id,
+        rxSiteId: item.rxSite.id,
+        sourceName: `${item.txSite.name} / ${item.sourceRadio.name}`,
+        sinkName: `${item.rxSite.name} / ${item.receiverRadio.name}`,
         transmitterEirpDensityDbmPerHz,
         distanceKm,
         propagationLossesDb: totalPathLossDb,
@@ -142,8 +141,8 @@ function modelLossAdjustmentDb(model: PropagationModel, distanceKm: number, freq
       return ((nominal - k) / nominal) * 6;
     }
     case 'Troposcatter': {
-      const A = p.constantA ?? 120;
-      return A + 30 * Math.log10(Math.max(distanceKm, 0.001)) + 10 * Math.log10(Math.max(frequencyMHz, 0.001));
+      const factor = p.constantA ?? 120;
+      return factor + 30 * Math.log10(Math.max(distanceKm, 0.001)) + 10 * Math.log10(Math.max(frequencyMHz, 0.001));
     }
     default:
       return 0;
@@ -172,25 +171,4 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
     Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
-}
-
-function antennaGainDb(antenna: AntennaModel): number {
-  if (antenna.gainOverrideDb != null) {
-    return antenna.gainOverrideDb;
-  }
-
-  switch (antenna.pattern) {
-    case 'Omnidirectional':
-      return 2.15;
-    case 'Vertical Dipole':
-      return 2.15;
-    case 'Vertical Monopole':
-      return 5.15;
-    case 'Horizontal Dipole':
-      return 2.15;
-    case 'Horn':
-      return 15;
-    default:
-      return 0;
-  }
 }

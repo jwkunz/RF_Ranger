@@ -1,33 +1,50 @@
 # RF Ranger Requirements
 
 ## Product Goal
-RF Ranger is a browser-based RF experimentation planning tool for modeling radio links between one transmitter source and multiple receiver sinks.
+RF Ranger is a browser-based RF experimentation planning tool for modeling radio links between named sites and independently managed radio equipment.
 
 ## Core UX
 - Startup splash screen with prominent project logo (`RF_Ranger.png`).
-- Legal notice displayed at splash bottom from `docs/LEGAL.md`.
 - Exclusive top tabs:
-  - Map View
+  - Welcome
   - Radios
   - Antennas
   - Propagation Models
+  - Sites
+  - Simulation
   - Reports
   - Preferences
   - Help
+  - Legal
+- Sites tab scope:
+  - Define sites only (name, coordinates, pin color).
+  - Add/update sites by map click, coordinate entry, or address geocoding.
+  - List all sites below map; selecting a site populates right-side property editor.
+- Simulation tab scope:
+  - Five-column simulation definition:
+    - Transmitter Site
+    - Source Radio
+    - Propagation Model
+    - Receiver Site
+    - Receiver Radio
+  - Add each definition to a simulation queue.
+  - Launch all queued simulations as a batch.
+- Reports tab shows latest simulation queue results.
 
 ## Persistence and Data Exchange
 - Persistent browser storage via IndexedDB.
 - Full workspace JSON export/import.
-- KML import/export for map pins (with sink bindings).
+- KML import/export for sites.
 - CSV export for reports.
 
 ## Simulation Rules
-- One active TX source per run.
-- Each map sink pin is bound to a sink radio and sink antenna.
+- Simulations are queued and executed in batch.
+- Each queue row independently binds:
+  - TX site + source radio
+  - propagation model
+  - RX site + receiver radio
 - Frequency mismatch allowed with warning.
-- Useable Link is `Y` only if both conditions pass:
-  - available RX power >= receiver sensitivity
-  - SNR >= configured threshold (default 10 dB)
+- Useable Link is `Y` only if available signal density meets required SNR threshold.
 
 ## Models
 - Antenna patterns: Omnidirectional, Vertical Dipole, Vertical Monopole, Horizontal Dipole, Horn.
@@ -49,7 +66,7 @@ RF Ranger is a browser-based RF experimentation planning tool for modeling radio
 
 ## Help and Legal
 - Help tab renders `docs/Manual.md`.
-- Splash legal notice renders `docs/LEGAL.md`.
+- Legal tab renders `docs/LEGAL.md`.
 
 ## Packaging and Release
 - Development: maintainable multi-file web app.
