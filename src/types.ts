@@ -88,9 +88,11 @@ export interface SimulationQueueItem {
   id: string;
   txSiteId: string;
   sourceRadioId: string;
+  txAntennaId: string;
   propagationModelId: string;
   rxSiteId: string;
   receiverRadioId: string;
+  rxAntennaId: string;
 }
 
 export interface SimulationResultRow {

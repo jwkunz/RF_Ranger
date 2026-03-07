@@ -20,7 +20,7 @@ On launch, RF Ranger displays a splash screen with project branding and legal no
 2. Define antenna models in Antennas.
 3. Define propagation presets.
 4. Define sites in Sites by map click, coordinates, or geocoding.
-5. In Simulation, add one or more queue rows selecting TX site/source radio/propagation model/RX site/receiver radio.
+5. In Simulation, add one or more queue rows selecting TX site/source radio/TX antenna/propagation model/RX site/receiver radio/RX antenna.
 6. Launch Simulations.
 6. Review output in Results and export CSV if needed.
 7. Use Report to generate a PDF with selected sections/fields.

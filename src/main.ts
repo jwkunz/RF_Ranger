@@ -45,12 +45,12 @@ const tabs: Array<{ id: TabId; label: string }> = [
 
 const propagationParameterDefaults: Record<PropagationModelType, Record<string, number>> = {
   'Free Space': { additionalLossDb: 0 },
-  'Two-Ray': { groundReflectionCoefficient: -1, txHeightM: 10, rxHeightM: 2 },
+  'Two-Ray': { groundReflectionCoefficient: -1 },
   'Knife-Edge': { obstacleHeightM: 10, d1Km: 1, d2Km: 1 },
   'Ground Wave': { conductivitySPerM: 0.005, dielectricConstant: 15 },
   Ionospheric: { criticalFrequencyMHz: 5, incidenceAngleDeg: 30 },
   'Log-Distance': { pathLossExponent: 3, referenceDistanceM: 1, referenceLossDb: 40 },
-  'Effective Earth Radius': { kFactor: 1.333333, txHeightM: 20, rxHeightM: 5 },
+  'Effective Earth Radius': { kFactor: 1.333333 },
   Troposcatter: { constantA: 120 }
 };
 
@@ -83,9 +83,7 @@ const propagationParameterMeta: Record<
       label: 'Ground Reflection Coefficient',
       symbol: '\\Gamma',
       description: 'Reflection coefficient for the ground-reflected path.'
-    },
-    txHeightM: { label: 'Transmitter Height', symbol: 'h_t', units: 'm', description: 'Transmitter antenna height above ground.' },
-    rxHeightM: { label: 'Receiver Height', symbol: 'h_r', units: 'm', description: 'Receiver antenna height above ground.' }
+    }
   },
   'Knife-Edge': {
     obstacleHeightM: { label: 'Obstacle Height', symbol: 'h', units: 'm', description: 'Effective knife-edge obstruction height.' },
@@ -111,9 +109,7 @@ const propagationParameterMeta: Record<
     referenceLossDb: { label: 'Reference Loss', symbol: '\\mathrm{PL}(d_0)', units: 'dB', description: 'Path loss at the reference distance.' }
   },
   'Effective Earth Radius': {
-    kFactor: { label: 'Effective Earth Radius Factor', symbol: 'k', description: 'Effective Earth radius factor for refraction model.' },
-    txHeightM: { label: 'Transmitter Height', symbol: 'h_1', units: 'm', description: 'Transmitter antenna height used in LOS estimate.' },
-    rxHeightM: { label: 'Receiver Height', symbol: 'h_2', units: 'm', description: 'Receiver antenna height used in LOS estimate.' }
+    kFactor: { label: 'Effective Earth Radius Factor', symbol: 'k', description: 'Effective Earth radius factor for refraction model.' }
   },
   Troposcatter: {
     constantA: { label: 'Empirical Constant', symbol: 'A', units: 'dB', description: 'Empirical constant in troposcatter loss model.' }
@@ -158,9 +154,11 @@ interface WorkerQueueItem {
   queueItemId: string;
   txSite: Site;
   sourceRadio: RadioSource;
+  txAntenna: AntennaModel;
   propagationModel: PropagationModel;
   rxSite: Site;
   receiverRadio: RadioSink;
+  rxAntenna: AntennaModel;
 }
 
 interface SimulationWorkerInput {
@@ -194,9 +192,11 @@ let pendingClickMarker: maplibregl.Marker | null = null;
 let selectedSiteId = '';
 let selectedSimulationTxSiteId = '';
 let selectedSimulationSourceRadioId = '';
+let selectedSimulationTxAntennaId = '';
 let selectedPropagationModelId = '';
 let selectedSimulationRxSiteId = '';
 let selectedSimulationReceiverRadioId = '';
+let selectedSimulationRxAntennaId = '';
 let mapCenter: [number, number] | null = null;
 let mapZoom = 4;
 let mapPaneWidthPx: number | null = null;
@@ -361,6 +361,9 @@ function renderSimulationTab(): string {
   const sourceRadioOptions = workspace.sources
     .map((source) => `<option value="${source.id}" ${source.id === selectedSimulationSourceRadioId ? 'selected' : ''}>${escapeHtml(source.name)}</option>`)
     .join('');
+  const txAntennaOptions = workspace.antennas
+    .map((antenna) => `<option value="${antenna.id}" ${antenna.id === selectedSimulationTxAntennaId ? 'selected' : ''}>${escapeHtml(antenna.name)}</option>`)
+    .join('');
   const propagationOptions = workspace.propagationModels
     .map(
       (model) =>
@@ -373,6 +376,9 @@ function renderSimulationTab(): string {
   const receiverRadioOptions = workspace.sinks
     .map((sink) => `<option value="${sink.id}" ${sink.id === selectedSimulationReceiverRadioId ? 'selected' : ''}>${escapeHtml(sink.name)}</option>`)
     .join('');
+  const rxAntennaOptions = workspace.antennas
+    .map((antenna) => `<option value="${antenna.id}" ${antenna.id === selectedSimulationRxAntennaId ? 'selected' : ''}>${escapeHtml(antenna.name)}</option>`)
+    .join('');
 
   const queueRows = workspace.simulationQueue
     .map((item) => {
@@ -381,13 +387,30 @@ function renderSimulationTab(): string {
       const modelName = workspace.propagationModels.find((model) => model.id === item.propagationModelId)?.name ?? '[missing model]';
       const rxSiteName = workspace.sites.find((site) => site.id === item.rxSiteId)?.name ?? '[missing site]';
       const receiverName = workspace.sinks.find((sink) => sink.id === item.receiverRadioId)?.name ?? '[missing receiver]';
+      const txAntennaName = workspace.antennas.find((antenna) => antenna.id === item.txAntennaId)?.name ?? '[missing tx antenna]';
+      const rxAntennaName = workspace.antennas.find((antenna) => antenna.id === item.rxAntennaId)?.name ?? '[missing rx antenna]';
       return `
       <div class="sim-columns sim-columns--queue">
         <div>${escapeHtml(txSiteName)}</div>
         <div>${escapeHtml(sourceName)}</div>
         <div>${escapeHtml(modelName)}</div>
         <div>${escapeHtml(rxSiteName)}</div>
-        <div>${escapeHtml(receiverName)} <button data-remove-queue="${item.id}">Remove</button></div>
+        <div>${escapeHtml(receiverName)}</div>
+      </div>`;
+    })
+    .join('');
+
+  const queueAntennaRows = workspace.simulationQueue
+    .map((item) => {
+      const txAntennaName = workspace.antennas.find((antenna) => antenna.id === item.txAntennaId)?.name ?? '[missing tx antenna]';
+      const rxAntennaName = workspace.antennas.find((antenna) => antenna.id === item.rxAntennaId)?.name ?? '[missing rx antenna]';
+      return `
+      <div class="sim-columns sim-columns--queue sim-columns--aux">
+        <div>${escapeHtml(txAntennaName)}</div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div>${escapeHtml(rxAntennaName)} <button data-remove-queue="${item.id}">Remove</button></div>
       </div>`;
     })
     .join('');
@@ -412,6 +435,20 @@ function renderSimulationTab(): string {
         <label><select id="sim-rx-site">${rxSiteOptions || '<option value="">No sites available</option>'}</select></label>
         <label><select id="sim-receiver-radio">${receiverRadioOptions || '<option value="">No receiver radios available</option>'}</select></label>
       </div>
+      <div class="sim-columns sim-columns--header">
+        <div>TX Antenna</div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div>RX Antenna</div>
+      </div>
+      <div class="sim-columns sim-columns--aux">
+        <label><select id="sim-tx-antenna">${txAntennaOptions || '<option value="">No antennas available</option>'}</select></label>
+        <div></div>
+        <div></div>
+        <div></div>
+        <label><select id="sim-rx-antenna">${rxAntennaOptions || '<option value="">No antennas available</option>'}</select></label>
+      </div>
       <div class="action-row">
         <button id="add-to-queue" class="primary-btn">Add to Simulation Queue</button>
       </div>
@@ -426,7 +463,15 @@ function renderSimulationTab(): string {
         <div>Receiver Site</div>
         <div>Receiver Radio</div>
       </div>
+      <div class="sim-columns sim-columns--header sim-columns--aux">
+        <div>TX Antenna</div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div>RX Antenna</div>
+      </div>
       ${queueRows || '<p class="muted">Queue is empty.</p>'}
+      ${queueAntennaRows}
       <div class="action-row">
         <button id="launch-simulations" class="primary-btn" ${progress.running || !workspace.simulationQueue.length ? 'disabled' : ''}>Launch Simulations</button>
       </div>
@@ -975,15 +1020,20 @@ function wireSitesEvents(): void {
 function wireSimulationEvents(): void {
   const txSiteSelect = document.querySelector<HTMLSelectElement>('#sim-tx-site');
   const sourceRadioSelect = document.querySelector<HTMLSelectElement>('#sim-source-radio');
+  const txAntennaSelect = document.querySelector<HTMLSelectElement>('#sim-tx-antenna');
   const propagationSelect = document.querySelector<HTMLSelectElement>('#sim-propagation');
   const rxSiteSelect = document.querySelector<HTMLSelectElement>('#sim-rx-site');
   const receiverRadioSelect = document.querySelector<HTMLSelectElement>('#sim-receiver-radio');
+  const rxAntennaSelect = document.querySelector<HTMLSelectElement>('#sim-rx-antenna');
 
   txSiteSelect?.addEventListener('change', () => {
     selectedSimulationTxSiteId = txSiteSelect.value;
   });
   sourceRadioSelect?.addEventListener('change', () => {
     selectedSimulationSourceRadioId = sourceRadioSelect.value;
+  });
+  txAntennaSelect?.addEventListener('change', () => {
+    selectedSimulationTxAntennaId = txAntennaSelect.value;
   });
   propagationSelect?.addEventListener('change', () => {
     selectedPropagationModelId = propagationSelect.value;
@@ -993,6 +1043,9 @@ function wireSimulationEvents(): void {
   });
   receiverRadioSelect?.addEventListener('change', () => {
     selectedSimulationReceiverRadioId = receiverRadioSelect.value;
+  });
+  rxAntennaSelect?.addEventListener('change', () => {
+    selectedSimulationRxAntennaId = rxAntennaSelect.value;
   });
 
   document.querySelector<HTMLButtonElement>('#add-to-queue')?.addEventListener('click', async () => {
@@ -1212,10 +1265,23 @@ async function generatePdfReport(): Promise<void> {
 
   if (reportIncludeTxAntenna) {
     writeHeader('TX Antenna Information');
-    writeWrapped('Current simulation queue does not bind TX antennas per run; listing known antennas.');
-    workspace.antennas.forEach((antenna) => {
-      writeWrapped(`- ${antenna.name}: ${antenna.pattern}, ${antenna.heightM} m, az ${antenna.azimuthDeg} deg, tilt ${antenna.tiltDeg} deg`);
-    });
+    const txAntennaIds = uniqueBy(
+      activeRun.rows.map((row) => {
+        const queueItem = workspace.simulationQueue.find((item) => item.id === row.queueItemId);
+        return queueItem?.txAntennaId ?? '';
+      })
+    ).filter(Boolean);
+    if (!txAntennaIds.length) {
+      writeWrapped('No linked TX antenna metadata found for this result run.');
+    } else {
+      txAntennaIds.forEach((antennaId) => {
+        const antenna = workspace.antennas.find((entry) => entry.id === antennaId);
+        if (!antenna) {
+          return;
+        }
+        writeWrapped(`- ${antenna.name}: ${antenna.pattern}, ${antenna.heightM} m, az ${antenna.azimuthDeg} deg, tilt ${antenna.tiltDeg} deg`);
+      });
+    }
   }
 
   if (reportIncludePropagationModel) {
@@ -1241,10 +1307,23 @@ async function generatePdfReport(): Promise<void> {
 
   if (reportIncludeRxAntenna) {
     writeHeader('RX Antenna Information');
-    writeWrapped('Current simulation queue does not bind RX antennas per run; listing known antennas.');
-    workspace.antennas.forEach((antenna) => {
-      writeWrapped(`- ${antenna.name}: ${antenna.pattern}, ${antenna.heightM} m, az ${antenna.azimuthDeg} deg, tilt ${antenna.tiltDeg} deg`);
-    });
+    const rxAntennaIds = uniqueBy(
+      activeRun.rows.map((row) => {
+        const queueItem = workspace.simulationQueue.find((item) => item.id === row.queueItemId);
+        return queueItem?.rxAntennaId ?? '';
+      })
+    ).filter(Boolean);
+    if (!rxAntennaIds.length) {
+      writeWrapped('No linked RX antenna metadata found for this result run.');
+    } else {
+      rxAntennaIds.forEach((antennaId) => {
+        const antenna = workspace.antennas.find((entry) => entry.id === antennaId);
+        if (!antenna) {
+          return;
+        }
+        writeWrapped(`- ${antenna.name}: ${antenna.pattern}, ${antenna.heightM} m, az ${antenna.azimuthDeg} deg, tilt ${antenna.tiltDeg} deg`);
+      });
+    }
   }
 
   if (reportIncludeRxRadio) {
@@ -1282,11 +1361,13 @@ async function addSimulationQueueItem(): Promise<void> {
   if (
     !selectedSimulationTxSiteId ||
     !selectedSimulationSourceRadioId ||
+    !selectedSimulationTxAntennaId ||
     !selectedPropagationModelId ||
     !selectedSimulationRxSiteId ||
-    !selectedSimulationReceiverRadioId
+    !selectedSimulationReceiverRadioId ||
+    !selectedSimulationRxAntennaId
   ) {
-    alert('Select all five simulation fields before adding to queue.');
+    alert('Select all simulation fields before adding to queue.');
     return;
   }
 
@@ -1294,9 +1375,11 @@ async function addSimulationQueueItem(): Promise<void> {
     id: uid(),
     txSiteId: selectedSimulationTxSiteId,
     sourceRadioId: selectedSimulationSourceRadioId,
+    txAntennaId: selectedSimulationTxAntennaId,
     propagationModelId: selectedPropagationModelId,
     rxSiteId: selectedSimulationRxSiteId,
-    receiverRadioId: selectedSimulationReceiverRadioId
+    receiverRadioId: selectedSimulationReceiverRadioId,
+    rxAntennaId: selectedSimulationRxAntennaId
   };
 
   workspace.simulationQueue.push(item);
@@ -1309,11 +1392,13 @@ async function runSimulationQueue(): Promise<void> {
     .map((item) => {
       const txSite = workspace.sites.find((site) => site.id === item.txSiteId);
       const sourceRadio = workspace.sources.find((source) => source.id === item.sourceRadioId);
+      const txAntenna = workspace.antennas.find((antenna) => antenna.id === item.txAntennaId);
       const propagationModel = workspace.propagationModels.find((model) => model.id === item.propagationModelId);
       const rxSite = workspace.sites.find((site) => site.id === item.rxSiteId);
       const receiverRadio = workspace.sinks.find((sink) => sink.id === item.receiverRadioId);
+      const rxAntenna = workspace.antennas.find((antenna) => antenna.id === item.rxAntennaId);
 
-      if (!txSite || !sourceRadio || !propagationModel || !rxSite || !receiverRadio) {
+      if (!txSite || !sourceRadio || !txAntenna || !propagationModel || !rxSite || !receiverRadio || !rxAntenna) {
         return null;
       }
 
@@ -1321,9 +1406,11 @@ async function runSimulationQueue(): Promise<void> {
         queueItemId: item.id,
         txSite,
         sourceRadio,
+        txAntenna,
         propagationModel,
         rxSite,
-        receiverRadio
+        receiverRadio,
+        rxAntenna
       } satisfies WorkerQueueItem;
     })
     .filter((item): item is WorkerQueueItem => item !== null);
@@ -1850,7 +1937,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
       longitude: number;
       kind?: 'source' | 'sink';
     }>;
-    simulationQueue?: SimulationQueueItem[];
+    simulationQueue?: Array<SimulationQueueItem & { txAntennaId?: string; rxAntennaId?: string }>;
     preferences?: WorkspaceSnapshot['preferences'];
     reportHistory?: Array<{ id?: string; createdAtIso?: string; rows?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }> }>;
     reportLatest?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }>;
@@ -1952,6 +2039,12 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     });
   }
 
+  const simulationQueue = (work.simulationQueue ?? []).map((item) => ({
+    ...item,
+    txAntennaId: item.txAntennaId ?? '',
+    rxAntennaId: item.rxAntennaId ?? ''
+  }));
+
   return {
     schemaVersion: 1,
     sources,
@@ -1959,7 +2052,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     antennas,
     propagationModels,
     sites,
-    simulationQueue: work.simulationQueue ?? [],
+    simulationQueue,
     preferences,
     reportLatest,
     reportHistory
@@ -1981,6 +2074,12 @@ function ensureSelectionDefaults(): void {
   }
   if (!workspace.sinks.some((entry) => entry.id === selectedSimulationReceiverRadioId)) {
     selectedSimulationReceiverRadioId = workspace.sinks[0]?.id ?? '';
+  }
+  if (!workspace.antennas.some((entry) => entry.id === selectedSimulationTxAntennaId)) {
+    selectedSimulationTxAntennaId = workspace.antennas[0]?.id ?? '';
+  }
+  if (!workspace.antennas.some((entry) => entry.id === selectedSimulationRxAntennaId)) {
+    selectedSimulationRxAntennaId = workspace.antennas[0]?.id ?? '';
   }
   if (!workspace.propagationModels.some((entry) => entry.id === selectedPropagationModelId)) {
     selectedPropagationModelId = workspace.propagationModels[0]?.id ?? '';

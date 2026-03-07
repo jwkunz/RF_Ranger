@@ -4,9 +4,11 @@ interface QueueSimulationInputItem {
   queueItemId: string;
   txSite: Site;
   sourceRadio: RadioSource;
+  txAntenna: { heightM: number };
   propagationModel: PropagationModel;
   rxSite: Site;
   receiverRadio: RadioSink;
+  rxAntenna: { heightM: number };
 }
 
 interface SimulationInput {
@@ -41,7 +43,13 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
       const frequencyMHz = item.sourceRadio.carrierFrequencyMHz;
 
       const baseFsplDb = 20 * Math.log10(Math.max(distanceKm, 0.001)) + 20 * Math.log10(Math.max(frequencyMHz, 0.001)) + 32.44;
-      const extraLossDb = modelLossAdjustmentDb(item.propagationModel, distanceKm, frequencyMHz);
+      const extraLossDb = modelLossAdjustmentDb(
+        item.propagationModel,
+        distanceKm,
+        frequencyMHz,
+        item.txAntenna.heightM,
+        item.rxAntenna.heightM
+      );
       const totalPathLossDb = baseFsplDb + extraLossDb;
 
       const txPowerDensityDbmPerHz = item.sourceRadio.txPowerDbm - 10 * Math.log10(Math.max(item.sourceRadio.bandwidthHz, 1));
@@ -105,15 +113,21 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
   }
 };
 
-function modelLossAdjustmentDb(model: PropagationModel, distanceKm: number, frequencyMHz: number): number {
+function modelLossAdjustmentDb(
+  model: PropagationModel,
+  distanceKm: number,
+  frequencyMHz: number,
+  txHeightM: number,
+  rxHeightM: number
+): number {
   const p = model.parameters;
 
   switch (model.modelType) {
     case 'Free Space':
       return p.additionalLossDb ?? 0;
     case 'Two-Ray': {
-      const txHeight = p.txHeightM ?? 10;
-      const rxHeight = p.rxHeightM ?? 2;
+      const txHeight = Math.max(txHeightM, 0.1);
+      const rxHeight = Math.max(rxHeightM, 0.1);
       const breakKm = ((4 * txHeight * rxHeight) / 0.3) / 1000;
       return distanceKm > breakKm ? 10 * Math.log10(Math.max(distanceKm / Math.max(breakKm, 0.001), 1)) * 2 : 0;
     }
@@ -146,7 +160,9 @@ function modelLossAdjustmentDb(model: PropagationModel, distanceKm: number, freq
     case 'Effective Earth Radius': {
       const k = p.kFactor ?? 1.333333;
       const nominal = 1.333333;
-      return ((nominal - k) / nominal) * 6;
+      const losKm = 3.57 * (Math.sqrt(Math.max(txHeightM, 0)) + Math.sqrt(Math.max(rxHeightM, 0)));
+      const beyondLosPenalty = distanceKm > losKm ? (distanceKm - losKm) * 0.2 : 0;
+      return ((nominal - k) / nominal) * 6 + beyondLosPenalty;
     }
     case 'Troposcatter': {
       const factor = p.constantA ?? 120;

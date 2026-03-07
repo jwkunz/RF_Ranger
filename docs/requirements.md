@@ -43,11 +43,12 @@ RF Ranger is a browser-based RF experimentation planning tool for modeling radio
 ## Simulation Rules
 - Simulations are queued and executed in batch.
 - Each queue row independently binds:
-  - TX site + source radio
+  - TX site + source radio + TX antenna
   - propagation model
-  - RX site + receiver radio
+  - RX site + receiver radio + RX antenna
 - Frequency mismatch allowed with warning.
 - Useable Link is `Y` only if available signal density meets required SNR threshold.
+- Propagation models requiring TX/RX heights derive those values from selected antenna heights in Simulation.
 
 ## Models
 - Antenna patterns: Omnidirectional, Vertical Dipole, Vertical Monopole, Horizontal Dipole, Horn.

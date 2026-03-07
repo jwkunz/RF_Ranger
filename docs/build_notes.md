@@ -437,3 +437,16 @@
 - Known Issues / Next Focus:
   - Map image capture can fail in browser contexts where canvas export is restricted; report includes fallback note in that case.
 - Commit: this commit (`milestone(M32): report tab pdf generator v0.33.0`)
+
+## M33 - Antenna-Driven Height Inputs for Propagation
+- Date: 2026-03-07
+- Version: 0.34.0
+- Completed:
+  - Removed transmitter/receiver height fields from propagation model input forms for models that previously requested them.
+  - Added TX and RX antenna selection into Simulation definition and queue items.
+  - Updated simulation worker propagation calculations to use selected antenna heights for model behavior (not model-form height parameters).
+  - Updated Effective Earth Radius handling to incorporate selected antenna heights in LOS/beyond-LOS loss shaping.
+  - Added queue migration fallback for older saved simulation queue entries missing antenna bindings.
+- Known Issues / Next Focus:
+  - Optional: add explicit validation messaging for legacy queue rows that lack antenna bindings until user re-saves them.
+- Commit: this commit (`milestone(M33): antenna-driven propagation heights v0.34.0`)
