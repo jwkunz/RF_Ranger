@@ -133,12 +133,13 @@ const RESULT_FIELD_OPTIONS: Array<{ id: string; label: string; value: (row: Simu
   { id: 'receiverSiteName', label: 'Receiver Site Name', value: (row) => row.receiverSiteName },
   { id: 'receiverCoordinates', label: 'Receiver Coordinates', value: (row) => row.receiverCoordinates },
   { id: 'receiverRadio', label: 'Receiver Radio', value: (row) => row.receiverRadio },
-  { id: 'transmitterEirpDensity', label: 'Transmitter EIRP Density', value: (row) => row.transmitterEirpDensityDbmPerHz.toFixed(2) },
+  { id: 'transmitterEirp', label: 'Transmitter EIRP', value: (row) => formatPower(row.transmitterEirpDbm) },
+  { id: 'transmitterEirpDensity', label: 'Transmitter EIRP Density', value: (row) => formatPowerDensity(row.transmitterEirpDensityDbmPerHz) },
   { id: 'distance', label: 'Distance', value: (row) => formatDistance(row.distanceKm) },
   { id: 'propagationLosses', label: 'Propagation Losses', value: (row) => `${row.propagationLossesDb.toFixed(2)} dB` },
-  { id: 'incidentRfDensity', label: 'Incident RF Power Density', value: (row) => formatPowerDensity(row.incidentRfPowerDensityDbmPerHz) },
-  { id: 'incidentField', label: 'Incident Electric Field', value: (row) => `${row.incidentElectricFieldVm.toExponential(3)} V/m` },
-  { id: 'signalPower', label: 'Signal Power Into Receiver', value: (row) => formatPowerDensity(row.availablePowerDensityAtAntennaDbmPerHz) },
+  { id: 'incidentRfDensity', label: 'Power Density at Receive Antenna', value: (row) => formatPowerDensity(row.incidentRfPowerDensityDbmPerHz) },
+  { id: 'incidentField', label: 'Electric Field Density at Receive Antenna', value: (row) => `${row.incidentElectricFieldVm.toExponential(3)} V/m` },
+  { id: 'signalPower', label: 'Power Density Into Receiver', value: (row) => formatPowerDensity(row.availablePowerDensityAtAntennaDbmPerHz) },
   { id: 'receiverNoiseFloor', label: 'Receiver Noise Floor', value: (row) => formatPowerDensity(row.receiverNoiseFloorDensityDbmPerHz) },
   { id: 'snr', label: 'SNR in Receiver', value: (row) => `${row.snrDb.toFixed(2)} dB` },
   { id: 'usableLink', label: 'Useable Link', value: (row) => row.usableLink },
@@ -178,8 +179,7 @@ const REPORT_TREE: ReportTreeCategory[] = [
       { id: 'txRadioComments', label: 'Comments' },
       { id: 'txRadioPower', label: 'TX Power (dBm)' },
       { id: 'txRadioFrequency', label: 'Carrier Frequency (MHz)' },
-      { id: 'txRadioBandwidth', label: 'Bandwidth (kHz)' },
-      { id: 'txRadioNoiseFigure', label: 'Noise Figure (dB)' }
+      { id: 'txRadioBandwidth', label: 'Bandwidth (kHz)' }
     ]
   },
   {
@@ -504,32 +504,19 @@ function renderSimulationTab(): string {
     .map((item) => {
       const txSiteName = workspace.sites.find((site) => site.id === item.txSiteId)?.name ?? '[missing site]';
       const sourceName = workspace.sources.find((source) => source.id === item.sourceRadioId)?.name ?? '[missing source]';
+      const txAntennaName = workspace.antennas.find((antenna) => antenna.id === item.txAntennaId)?.name ?? '[missing tx antenna]';
       const modelName = workspace.propagationModels.find((model) => model.id === item.propagationModelId)?.name ?? '[missing model]';
       const rxSiteName = workspace.sites.find((site) => site.id === item.rxSiteId)?.name ?? '[missing site]';
       const receiverName = workspace.sinks.find((sink) => sink.id === item.receiverRadioId)?.name ?? '[missing receiver]';
-      const txAntennaName = workspace.antennas.find((antenna) => antenna.id === item.txAntennaId)?.name ?? '[missing tx antenna]';
       const rxAntennaName = workspace.antennas.find((antenna) => antenna.id === item.rxAntennaId)?.name ?? '[missing rx antenna]';
       return `
       <div class="sim-columns sim-columns--queue">
         <div>${escapeHtml(txSiteName)}</div>
         <div>${escapeHtml(sourceName)}</div>
+        <div>${escapeHtml(txAntennaName)}</div>
         <div>${escapeHtml(modelName)}</div>
         <div>${escapeHtml(rxSiteName)}</div>
         <div>${escapeHtml(receiverName)}</div>
-      </div>`;
-    })
-    .join('');
-
-  const queueAntennaRows = workspace.simulationQueue
-    .map((item) => {
-      const txAntennaName = workspace.antennas.find((antenna) => antenna.id === item.txAntennaId)?.name ?? '[missing tx antenna]';
-      const rxAntennaName = workspace.antennas.find((antenna) => antenna.id === item.rxAntennaId)?.name ?? '[missing rx antenna]';
-      return `
-      <div class="sim-columns sim-columns--queue sim-columns--aux">
-        <div>${escapeHtml(txAntennaName)}</div>
-        <div></div>
-        <div></div>
-        <div></div>
         <div>${escapeHtml(rxAntennaName)} <button data-remove-queue="${item.id}">Remove</button></div>
       </div>`;
     })
@@ -544,29 +531,19 @@ function renderSimulationTab(): string {
       <div class="sim-columns sim-columns--header">
         <div>Transmitter Site</div>
         <div>Source Radio</div>
+        <div>TX Antenna</div>
         <div>Propagation Model</div>
         <div>Receiver Site</div>
         <div>Receiver Radio</div>
+        <div>RX Antenna</div>
       </div>
       <div class="sim-columns">
         <label><select id="sim-tx-site">${txSiteOptions || '<option value="">No sites available</option>'}</select></label>
         <label><select id="sim-source-radio">${sourceRadioOptions || '<option value="">No source radios available</option>'}</select></label>
+        <label><select id="sim-tx-antenna">${txAntennaOptions || '<option value="">No antennas available</option>'}</select></label>
         <label><select id="sim-propagation">${propagationOptions || '<option value="">No propagation models available</option>'}</select></label>
         <label><select id="sim-rx-site">${rxSiteOptions || '<option value="">No sites available</option>'}</select></label>
         <label><select id="sim-receiver-radio">${receiverRadioOptions || '<option value="">No receiver radios available</option>'}</select></label>
-      </div>
-      <div class="sim-columns sim-columns--header">
-        <div>TX Antenna</div>
-        <div></div>
-        <div></div>
-        <div></div>
-        <div>RX Antenna</div>
-      </div>
-      <div class="sim-columns sim-columns--aux">
-        <label><select id="sim-tx-antenna">${txAntennaOptions || '<option value="">No antennas available</option>'}</select></label>
-        <div></div>
-        <div></div>
-        <div></div>
         <label><select id="sim-rx-antenna">${rxAntennaOptions || '<option value="">No antennas available</option>'}</select></label>
       </div>
       <div class="action-row">
@@ -579,19 +556,13 @@ function renderSimulationTab(): string {
       <div class="sim-columns sim-columns--header">
         <div>Transmitter Site</div>
         <div>Source Radio</div>
+        <div>TX Antenna</div>
         <div>Propagation Model</div>
         <div>Receiver Site</div>
         <div>Receiver Radio</div>
-      </div>
-      <div class="sim-columns sim-columns--header sim-columns--aux">
-        <div>TX Antenna</div>
-        <div></div>
-        <div></div>
-        <div></div>
         <div>RX Antenna</div>
       </div>
       ${queueRows || '<p class="muted">Queue is empty.</p>'}
-      ${queueAntennaRows}
       <div class="action-row">
         <button id="launch-simulations" class="primary-btn" ${progress.running || !workspace.simulationQueue.length ? 'disabled' : ''}>Launch Simulations</button>
       </div>
@@ -626,6 +597,7 @@ function renderReportsTab(): string {
         <td>${escapeHtml(row.receiverSiteName)}</td>
         <td>${escapeHtml(row.receiverCoordinates)}</td>
         <td>${escapeHtml(row.receiverRadio)}</td>
+        <td>${formatPower(row.transmitterEirpDbm)}</td>
         <td>${formatPowerDensity(row.transmitterEirpDensityDbmPerHz)}</td>
         <td>${formatDistance(row.distanceKm)}</td>
         <td>${row.propagationLossesDb.toFixed(2)} dB</td>
@@ -676,12 +648,13 @@ function renderReportsTab(): string {
             <th>Receiver Site Name</th>
             <th>Receiver Coordinates</th>
             <th>Receiver Radio</th>
+            <th>Transmitter EIRP</th>
             <th>Transmitter EIRP Density</th>
             <th>Distance</th>
             <th>Propagation Losses</th>
-            <th>Incident RF Power Density</th>
-            <th>Incident Electric Field</th>
-            <th>Signal Power Into Receiver</th>
+            <th>Power Density at Receive Antenna</th>
+            <th>Electric Field Density at Receive Antenna</th>
+            <th>Power Density Into Receiver</th>
             <th>Receiver Noise Floor</th>
             <th>SNR in Receiver</th>
             <th>Useable Link</th>
@@ -689,7 +662,7 @@ function renderReportsTab(): string {
             <th>Jump</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="20">No visible result data. Check runs in the queue below.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="21">No visible result data. Check runs in the queue below.</td></tr>'}</tbody>
       </table>
     </section>
     <section class="panel">
@@ -803,7 +776,6 @@ function renderRadiosTab(): string {
         <td>${source.txPowerDbm}</td>
         <td>${source.carrierFrequencyMHz}</td>
         <td>${(source.bandwidthHz / 1000).toFixed(3)}</td>
-        <td>${source.noiseFigureDb}</td>
         <td><button data-edit-source="${source.id}">Edit</button> <button data-delete-source="${source.id}">Delete</button></td>
       </tr>`
     )
@@ -835,15 +807,14 @@ function renderRadiosTab(): string {
         <label>TX Power (dBm)<input name="txPowerDbm" type="number" step="0.1" required /></label>
         <label>Carrier Frequency (MHz)<input name="carrierFrequencyMHz" type="number" step="0.001" required /></label>
         <label>Bandwidth (kHz)<input name="bandwidthKHz" type="number" step="0.001" required /></label>
-        <label>Noise Figure (dB)<input name="noiseFigureDb" type="number" step="0.1" required /></label>
         <button class="primary-btn" type="submit">Add Source</button>
       </form>
     </section>
     <section class="panel">
       <h3>Sources</h3>
       <table>
-        <thead><tr><th>Name</th><th>Comments</th><th>TX Power (dBm)</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>NF (dB)</th><th>Actions</th></tr></thead>
-        <tbody>${sourceRows || '<tr><td colspan="7">No sources yet.</td></tr>'}</tbody>
+        <thead><tr><th>Name</th><th>Comments</th><th>TX Power (dBm)</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>Actions</th></tr></thead>
+        <tbody>${sourceRows || '<tr><td colspan="6">No sources yet.</td></tr>'}</tbody>
       </table>
     </section>
     <section class="panel">
@@ -1517,7 +1488,6 @@ async function generatePdfReport(): Promise<void> {
       if (selectedReportTreeIds.has('txRadioPower')) lines.push(`TX Power: ${entry.txPowerDbm} dBm`);
       if (selectedReportTreeIds.has('txRadioFrequency')) lines.push(`Carrier Frequency: ${entry.carrierFrequencyMHz} MHz`);
       if (selectedReportTreeIds.has('txRadioBandwidth')) lines.push(`Bandwidth: ${(entry.bandwidthHz / 1000).toFixed(3)} kHz`);
-      if (selectedReportTreeIds.has('txRadioNoiseFigure')) lines.push(`Noise Figure: ${entry.noiseFigureDb} dB`);
       lines.forEach((line) => writeWrapped(`- ${line}`));
       });
     }
@@ -1982,8 +1952,7 @@ function wireRadiosEvents(): void {
       comments: String(data.get('comments') ?? '').trim(),
       txPowerDbm: toNumber(data.get('txPowerDbm')),
       carrierFrequencyMHz: toNumber(data.get('carrierFrequencyMHz')),
-      bandwidthHz: toNumber(data.get('bandwidthKHz')) * 1000,
-      noiseFigureDb: toNumber(data.get('noiseFigureDb'))
+      bandwidthHz: toNumber(data.get('bandwidthKHz')) * 1000
     };
     workspace.sources.push(source);
     ensureSelectionDefaults();
@@ -2312,6 +2281,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     receiverRadio: row.receiverRadio ?? 'Unknown RX Radio',
     sourceName: row.sourceName ?? 'Unknown Source',
     sinkName: row.sinkName ?? 'Unknown Sink',
+    transmitterEirpDbm: row.transmitterEirpDbm ?? 0,
     transmitterEirpDensityDbmPerHz: row.transmitterEirpDensityDbmPerHz ?? 0,
     distanceKm: row.distanceKm ?? 0,
     propagationLossesDb: row.propagationLossesDb ?? 0,
@@ -2443,6 +2413,13 @@ function wireMapResizer(layout: HTMLDivElement, resizer: HTMLDivElement): void {
 
 function applyTheme(): void {
   document.documentElement.dataset.theme = workspace.preferences.theme;
+}
+
+function formatPower(dbm: number): string {
+  if (workspace.preferences.powerUnit === 'dBW') {
+    return `${(dbm - 30).toFixed(2)} dBW`;
+  }
+  return `${dbm.toFixed(2)} dBm`;
 }
 
 function formatPowerDensity(dbmPerHz: number): string {

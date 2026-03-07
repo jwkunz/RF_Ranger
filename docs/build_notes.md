@@ -521,3 +521,22 @@
 - Known Issues / Next Focus:
   - Browser capture remains dependent on map tile CORS availability for PNG export success.
 - Commit: this commit (`milestone(M38): site screenshot png save and x-marker controls v0.39.0`)
+
+## M39 - TX EIRP Fielding + Result Label Updates + Single-Row Simulation Layout
+- Date: 2026-03-07
+- Version: 0.40.0
+- Completed:
+  - Removed TX noise figure from source radio schema and UI entry/table fields.
+  - Updated simulation math to include antenna gain:
+    - `Transmitter EIRP = TX Power + TX antenna gain`
+    - `Transmitter EIRP Density = TX power density + TX antenna gain`
+    - `Power Density Into Receiver = Power Density at Receive Antenna + RX antenna gain`
+  - Added `Transmitter EIRP` column/field before `Transmitter EIRP Density` in Results and CSV export.
+  - Renamed result labels:
+    - `Signal Power Into Receiver` -> `Power Density Into Receiver`
+    - `Incident RF Power Density` -> `Power Density at Receive Antenna`
+    - `Incident Electric Field` -> `Electric Field Density at Receive Antenna`
+  - Refactored Simulation tab define/queue layouts so TX/RX site/radio/antenna fields render on a single row.
+- Known Issues / Next Focus:
+  - Default antenna-pattern gains are currently fixed heuristics unless an override gain is provided.
+- Commit: this commit (`milestone(M39): eirp reporting and single-row simulation layout v0.40.0`)

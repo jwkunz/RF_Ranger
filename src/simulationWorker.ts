@@ -1,14 +1,14 @@
-import type { PropagationModel, RadioSink, RadioSource, SimulationResultRow, Site } from './types';
+import type { AntennaPattern, PropagationModel, RadioSink, RadioSource, SimulationResultRow, Site } from './types';
 
 interface QueueSimulationInputItem {
   queueItemId: string;
   txSite: Site;
   sourceRadio: RadioSource;
-  txAntenna: { heightM: number };
+  txAntenna: { heightM: number; pattern: AntennaPattern; gainOverrideDb?: number };
   propagationModel: PropagationModel;
   rxSite: Site;
   receiverRadio: RadioSink;
-  rxAntenna: { heightM: number };
+  rxAntenna: { heightM: number; pattern: AntennaPattern; gainOverrideDb?: number };
 }
 
 interface SimulationInput {
@@ -52,11 +52,14 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
       );
       const totalPathLossDb = baseFsplDb + extraLossDb;
 
+      const txGainDb = antennaGainDb(item.txAntenna.pattern, item.txAntenna.gainOverrideDb);
+      const rxGainDb = antennaGainDb(item.rxAntenna.pattern, item.rxAntenna.gainOverrideDb);
+      const transmitterEirpDbm = item.sourceRadio.txPowerDbm + txGainDb;
       const txPowerDensityDbmPerHz = item.sourceRadio.txPowerDbm - 10 * Math.log10(Math.max(item.sourceRadio.bandwidthHz, 1));
-      const transmitterEirpDensityDbmPerHz = txPowerDensityDbmPerHz;
+      const transmitterEirpDensityDbmPerHz = txPowerDensityDbmPerHz + txGainDb;
 
       const incidentRfPowerDensityDbmPerHz = transmitterEirpDensityDbmPerHz - totalPathLossDb;
-      const availablePowerDensityAtAntennaDbmPerHz = incidentRfPowerDensityDbmPerHz;
+      const availablePowerDensityAtAntennaDbmPerHz = incidentRfPowerDensityDbmPerHz + rxGainDb;
 
       const receiverNoiseFloorDensityDbmPerHz = thermalNoiseDensityDbmPerHz(
         item.receiverRadio.environmentNoiseTemperatureK ?? 300,
@@ -89,6 +92,7 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
         receiverRadio: item.receiverRadio.name,
         sourceName: `${item.txSite.name} / ${item.sourceRadio.name}`,
         sinkName: `${item.rxSite.name} / ${item.receiverRadio.name}`,
+        transmitterEirpDbm,
         transmitterEirpDensityDbmPerHz,
         distanceKm,
         propagationLossesDb: totalPathLossDb,
@@ -184,6 +188,26 @@ function thermalNoiseDensityDbmPerHz(temperatureK: number, noiseFigureDb: number
   const boltzmann = 1.380649e-23;
   const noiseWatts = boltzmann * Math.max(temperatureK + receiverEquivalentTempK, 1);
   return 10 * Math.log10(noiseWatts * 1000);
+}
+
+function antennaGainDb(pattern: AntennaPattern, gainOverrideDb?: number): number {
+  if (typeof gainOverrideDb === 'number' && Number.isFinite(gainOverrideDb)) {
+    return gainOverrideDb;
+  }
+  switch (pattern) {
+    case 'Omnidirectional':
+      return 2.15;
+    case 'Vertical Dipole':
+      return 2.15;
+    case 'Vertical Monopole':
+      return 5.15;
+    case 'Horizontal Dipole':
+      return 2.15;
+    case 'Horn':
+      return 15;
+    default:
+      return 0;
+  }
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {

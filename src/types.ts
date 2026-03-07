@@ -41,7 +41,6 @@ export interface RadioSource {
   txPowerDbm: number;
   carrierFrequencyMHz: number;
   bandwidthHz: number;
-  noiseFigureDb: number;
 }
 
 export interface RadioSink {
@@ -109,6 +108,7 @@ export interface SimulationResultRow {
   receiverRadio: string;
   sourceName: string;
   sinkName: string;
+  transmitterEirpDbm: number;
   transmitterEirpDensityDbmPerHz: number;
   distanceKm: number;
   propagationLossesDb: number;
