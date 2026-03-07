@@ -133,6 +133,10 @@ label {
   font-size: 0.8rem;
 }
 
+.field-symbol .katex {
+  font-size: 1em;
+}
+
 input,
 select,
 textarea,

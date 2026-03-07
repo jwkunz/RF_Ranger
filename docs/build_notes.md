@@ -364,3 +364,15 @@
 - Known Issues / Next Focus:
   - Optional: render symbols with full math typography in form labels, not just unicode/plain text.
 - Commit: this commit (`milestone(M27): align propagation parameter symbols v0.28.0`)
+
+## M28 - KaTeX Symbols in Propagation Input Labels
+- Date: 2026-03-07
+- Version: 0.29.0
+- Completed:
+  - Updated propagation input label symbols to render with KaTeX inline math in the form controls.
+  - Converted symbol metadata to LaTeX-friendly forms (e.g., `\\Gamma`, `\\sigma`, `\\epsilon_r`, `\\theta`, `\\mathrm{PL}(d_0)`, `L_{add}`).
+  - Kept parameter key names and simulation behavior unchanged.
+  - Added small style adjustment for inline KaTeX sizing in labels.
+- Known Issues / Next Focus:
+  - Optional: render engineering units with math-mode formatting where appropriate.
+- Commit: this commit (`milestone(M28): katex symbols in propagation labels v0.29.0`)

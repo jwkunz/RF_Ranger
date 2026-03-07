@@ -58,7 +58,7 @@ const propagationParameterMeta: Record<
   'Free Space': {
     additionalLossDb: {
       label: 'Additional Loss',
-      symbol: 'L_add',
+      symbol: 'L_{add}',
       units: 'dB',
       description: 'Extra path loss term added on top of FSPL.'
     }
@@ -66,7 +66,7 @@ const propagationParameterMeta: Record<
   'Two-Ray': {
     groundReflectionCoefficient: {
       label: 'Ground Reflection Coefficient',
-      symbol: 'Γ',
+      symbol: '\\Gamma',
       description: 'Reflection coefficient for the ground-reflected path.'
     },
     txHeightM: { label: 'Transmitter Height', symbol: 'h_t', units: 'm', description: 'Transmitter antenna height above ground.' },
@@ -78,17 +78,22 @@ const propagationParameterMeta: Record<
     d2Km: { label: 'Obstacle-to-Rx Distance', symbol: 'd_2', units: 'km', description: 'Distance from obstacle to receiver.' }
   },
   'Ground Wave': {
-    conductivitySPerM: { label: 'Ground Conductivity', symbol: 'σ', units: 'S/m', description: 'Ground conductivity of the propagation surface.' },
-    dielectricConstant: { label: 'Relative Permittivity', symbol: 'ε_r', description: 'Ground relative dielectric constant.' }
+    conductivitySPerM: {
+      label: 'Ground Conductivity',
+      symbol: '\\sigma',
+      units: 'S/m',
+      description: 'Ground conductivity of the propagation surface.'
+    },
+    dielectricConstant: { label: 'Relative Permittivity', symbol: '\\epsilon_r', description: 'Ground relative dielectric constant.' }
   },
   Ionospheric: {
     criticalFrequencyMHz: { label: 'Critical Frequency', symbol: 'f_c', units: 'MHz', description: 'Ionospheric critical frequency used in secant law.' },
-    incidenceAngleDeg: { label: 'Incidence Angle', symbol: 'θ', units: 'deg', description: 'Wave incidence angle into the ionosphere.' }
+    incidenceAngleDeg: { label: 'Incidence Angle', symbol: '\\theta', units: 'deg', description: 'Wave incidence angle into the ionosphere.' }
   },
   'Log-Distance': {
     pathLossExponent: { label: 'Path Loss Exponent', symbol: 'n', description: 'Environment-dependent log-distance exponent.' },
     referenceDistanceM: { label: 'Reference Distance', symbol: 'd_0', units: 'm', description: 'Reference distance for anchor loss.' },
-    referenceLossDb: { label: 'Reference Loss', symbol: 'PL(d_0)', units: 'dB', description: 'Path loss at the reference distance.' }
+    referenceLossDb: { label: 'Reference Loss', symbol: '\\mathrm{PL}(d_0)', units: 'dB', description: 'Path loss at the reference distance.' }
   },
   'Effective Earth Radius': {
     kFactor: { label: 'Effective Earth Radius Factor', symbol: 'k', description: 'Effective Earth radius factor for refraction model.' },
@@ -600,10 +605,13 @@ function renderPropagationTab(): string {
   const parameterInputs = Object.entries(propagationParameterDefaults[activePropagationType])
     .map(([key, value]) => {
       const meta = propagationParameterMeta[activePropagationType]?.[key];
-      const units = meta?.units ? `, ${meta.units}` : '';
-      const header = meta ? `${meta.label} (${meta.symbol}${units})` : prettyLabel(key);
+      const units = meta?.units ? `, ${escapeHtml(meta.units)}` : '';
+      const symbol = meta ? renderMathInline(meta.symbol) : '';
+      const header = meta
+        ? `${escapeHtml(meta.label)} <span class="field-symbol">(${symbol}${units})</span>`
+        : escapeHtml(prettyLabel(key));
       const description = meta?.description ? `<small class="field-help">${escapeHtml(meta.description)}</small>` : '';
-      return `<label>${escapeHtml(header)}<input data-prop-param="${key}" type="number" step="0.0001" value="${value}" />${description}</label>`;
+      return `<label>${header}<input data-prop-param="${key}" type="number" step="0.0001" value="${value}" />${description}</label>`;
     })
     .join('');
 
@@ -1638,6 +1646,10 @@ function renderMarkdownSection(markdown: string): string {
 function renderModelGuideHtml(markdown: string): string {
   const normalized = markdown.replace(/\n\[\n([\s\S]*?)\n\]\n/g, (_match, body: string) => `\n\n$$\n${body.trim()}\n$$\n\n`);
   return modelGuideMarkdown.render(normalized);
+}
+
+function renderMathInline(latex: string): string {
+  return katex.renderToString(latex, { throwOnError: false, strict: 'ignore', displayMode: false });
 }
 
 function extractPropagationModelSection(modelType: PropagationModelType, markdown: string): string {
