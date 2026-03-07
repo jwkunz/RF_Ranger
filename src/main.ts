@@ -321,8 +321,14 @@ function renderReportsTab(): string {
     .map((row) => {
       const highlighted = row.queueItemId === focusedReportQueueItemId ? ' class="focus-row"' : '';
       return `<tr${highlighted}>
-        <td>${escapeHtml(row.sourceName)}</td>
-        <td>${escapeHtml(row.sinkName)}</td>
+        <td>${escapeHtml(row.transmitterSiteName)}</td>
+        <td>${escapeHtml(row.transmitterCoordinates)}</td>
+        <td>${escapeHtml(row.transmitterRadio)}</td>
+        <td>${row.frequencyMHz.toFixed(3)}</td>
+        <td>${row.bandwidthKHz.toFixed(3)}</td>
+        <td>${escapeHtml(row.receiverSiteName)}</td>
+        <td>${escapeHtml(row.receiverCoordinates)}</td>
+        <td>${escapeHtml(row.receiverRadio)}</td>
         <td>${formatPowerDensity(row.transmitterEirpDensityDbmPerHz)}</td>
         <td>${formatDistance(row.distanceKm)}</td>
         <td>${row.propagationLossesDb.toFixed(2)} dB</td>
@@ -347,8 +353,14 @@ function renderReportsTab(): string {
       <table>
         <thead>
           <tr>
-            <th>Source</th>
-            <th>Sink</th>
+            <th>Transmitter Site Name</th>
+            <th>Transmitter Coordinates</th>
+            <th>Transmitter Radio</th>
+            <th>Frequency (MHz)</th>
+            <th>Bandwidth (kHz)</th>
+            <th>Receiver Site Name</th>
+            <th>Receiver Coordinates</th>
+            <th>Receiver Radio</th>
             <th>Transmitter EIRP Density</th>
             <th>Distance</th>
             <th>Propagation Losses</th>
@@ -362,7 +374,7 @@ function renderReportsTab(): string {
             <th>Jump</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="13">No report data. Launch simulations from the Simulation tab.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="19">No report data. Launch simulations from the Simulation tab.</td></tr>'}</tbody>
       </table>
     </section>
   `;
@@ -1359,6 +1371,14 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     queueItemId: row.queueItemId ?? row.sinkPinId ?? '',
     txSiteId: row.txSiteId ?? '',
     rxSiteId: row.rxSiteId ?? '',
+    transmitterSiteName: row.transmitterSiteName ?? row.sourceName ?? 'Unknown TX Site',
+    transmitterCoordinates: row.transmitterCoordinates ?? '',
+    transmitterRadio: row.transmitterRadio ?? 'Unknown TX Radio',
+    frequencyMHz: row.frequencyMHz ?? 0,
+    bandwidthKHz: row.bandwidthKHz ?? 0,
+    receiverSiteName: row.receiverSiteName ?? row.sinkName ?? 'Unknown RX Site',
+    receiverCoordinates: row.receiverCoordinates ?? '',
+    receiverRadio: row.receiverRadio ?? 'Unknown RX Radio',
     sourceName: row.sourceName ?? 'Unknown Source',
     sinkName: row.sinkName ?? 'Unknown Sink',
     transmitterEirpDensityDbmPerHz: row.transmitterEirpDensityDbmPerHz ?? 0,

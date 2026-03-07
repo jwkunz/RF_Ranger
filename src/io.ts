@@ -80,8 +80,14 @@ export async function parseSitesKml(file: File): Promise<Site[]> {
 
 export function exportReportsCsv(rows: SimulationResultRow[]): void {
   const header = [
-    'Source Name',
-    'Sink Name',
+    'Transmitter Site Name',
+    'Transmitter Coordinates',
+    'Transmitter Radio',
+    'Frequency (MHz)',
+    'Bandwidth (kHz)',
+    'Receiver Site Name',
+    'Receiver Coordinates',
+    'Receiver Radio',
     'Transmitter EIRP Density',
     'Distance',
     'Propagation Losses',
@@ -94,8 +100,14 @@ export function exportReportsCsv(rows: SimulationResultRow[]): void {
   ];
   const lines = rows.map((row) =>
     [
-      row.sourceName,
-      row.sinkName,
+      row.transmitterSiteName,
+      row.transmitterCoordinates,
+      row.transmitterRadio,
+      row.frequencyMHz.toString(),
+      row.bandwidthKHz.toString(),
+      row.receiverSiteName,
+      row.receiverCoordinates,
+      row.receiverRadio,
       row.transmitterEirpDensityDbmPerHz.toString(),
       row.distanceKm.toString(),
       row.propagationLossesDb.toString(),

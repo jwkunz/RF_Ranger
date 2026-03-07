@@ -91,6 +91,14 @@ export interface SimulationResultRow {
   queueItemId: string;
   txSiteId: string;
   rxSiteId: string;
+  transmitterSiteName: string;
+  transmitterCoordinates: string;
+  transmitterRadio: string;
+  frequencyMHz: number;
+  bandwidthKHz: number;
+  receiverSiteName: string;
+  receiverCoordinates: string;
+  receiverRadio: string;
   sourceName: string;
   sinkName: string;
   transmitterEirpDensityDbmPerHz: number;

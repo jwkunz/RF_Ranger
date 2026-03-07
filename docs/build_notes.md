@@ -295,3 +295,23 @@
 - Known Issues / Next Focus:
   - Antenna models are currently not explicitly selected per queue row; consider adding per-row TX/RX antenna binding in a future milestone.
 - Commit: this commit (`milestone(M22): sites and queued simulations refactor v0.23.0`)
+
+## M23 - Report Metadata Columns (TX/RX Site+Radio Context)
+- Date: 2026-03-07
+- Version: 0.24.0
+- Completed:
+  - Added report columns for transmitter and receiver context:
+    - Transmitter Site Name
+    - Transmitter Coordinates
+    - Transmitter Radio
+    - Frequency (MHz)
+    - Bandwidth (kHz)
+    - Receiver Site Name
+    - Receiver Coordinates
+    - Receiver Radio
+  - Updated simulation worker outputs to populate the new report metadata fields.
+  - Updated CSV export schema to include the new columns.
+  - Added backward-compatible normalization defaults so older saved report rows still load.
+- Known Issues / Next Focus:
+  - Optional: add sort/filter controls in Reports for large simulation queues.
+- Commit: this commit (`milestone(M23): report tx-rx metadata columns v0.24.0`)
