@@ -8,16 +8,14 @@ Below is a structured overview of commonly used analytic models applicable to **
 
 The simplest analytic propagation model assumes unobstructed propagation in a homogeneous medium.
 
-[
+$$
 P_r = P_t G_t G_r \left(\frac{\lambda}{4\pi d}\right)^2
-]
-
+$$
 In logarithmic form:
 
-[
+$$
 FSPL(dB) = 20\log_{10}(d) + 20\log_{10}(f) + 32.44
-]
-
+$$
 *(d in km, f in MHz)*
 
 ## Physical Interpretation
@@ -60,23 +58,21 @@ Considers **direct path + single ground-reflected path**.
 
 Received field:
 
-[
+$$
 E_r = \frac{E_0}{d_1} e^{-jkd_1} + \Gamma \frac{E_0}{d_2} e^{-jkd_2}
-]
-
+$$
 Where:
 
-* ( \Gamma ) = ground reflection coefficient
-* ( d_1 ) = direct path
-* ( d_2 ) = reflected path
+* $\Gamma$ = ground reflection coefficient
+* $d_1$ = direct path
+* $d_2$ = reflected path
 
 At large distances, it simplifies to:
 
-[
+$$
 P_r \propto \frac{1}{d^4}
-]
-
-instead of (1/d^2).
+$$
+instead of $1/d^2$.
 
 ## Valid Conditions
 
@@ -113,16 +109,14 @@ Approximates diffraction over a sharp obstacle.
 
 Diffraction parameter:
 
-[
+$$
 \nu = h\sqrt{\frac{2(d_1+d_2)}{\lambda d_1 d_2}}
-]
-
+$$
 Loss approximation:
 
-[
+$$
 L_d \approx 6.9 + 20\log_{10}\left(\sqrt{(\nu-0.1)^2+1} + \nu -0.1\right)
-]
-
+$$
 ## Valid Conditions
 
 Works well when:
@@ -156,14 +150,13 @@ Describes **surface waves traveling along Earth**.
 
 Field strength approximated by:
 
-[
+$$
 E(d) = \frac{E_0}{d}F(d,\sigma,\epsilon_r,f)
-]
+$$
+where $F$ is a **surface attenuation function** depending on:
 
-where (F) is a **surface attenuation function** depending on:
-
-* ground conductivity ( \sigma )
-* dielectric constant ( \epsilon_r )
+* ground conductivity $\sigma$
+* dielectric constant $\epsilon_r$
 * frequency
 
 Often simplified via **Norton surface-wave approximation**.
@@ -202,22 +195,20 @@ HF propagation via ionospheric refraction.
 
 Basic **secant law**:
 
-[
+$$
 f_{MUF} = f_c \sec \theta
-]
-
+$$
 Where:
 
-* (f_{MUF}) = maximum usable frequency
-* (f_c) = critical frequency
-* (\theta) = incidence angle
+* $f_{MUF}$ = maximum usable frequency
+* $f_c$ = critical frequency
+* $\theta$ = incidence angle
 
 Often combined with **Chapman electron density profile**:
 
-[
+$$
 N(h) = N_{max} e^{\frac{1}{2}(1-z-e^{-z})}
-]
-
+$$
 ## Valid Conditions
 
 Works when:
@@ -249,13 +240,12 @@ Breaks when:
 
 A statistical analytic model:
 
-[
+$$
 PL(d) = PL(d_0) + 10n\log_{10}(d/d_0)
-]
-
+$$
 Where:
 
-* (n) = path loss exponent (environment dependent)
+* $n$ = path loss exponent (environment dependent)
 
 Typical values:
 
@@ -295,22 +285,19 @@ Does not model:
 
 Microwave propagation often modeled using **effective Earth radius**:
 
-[
+$$
 k = \frac{R_{eff}}{R_{earth}}
-]
-
+$$
 Typical:
 
-[
+$$
 k \approx \frac{4}{3}
-]
-
+$$
 This modifies LOS distance:
 
-[
+$$
 d_{LOS} \approx 3.57(\sqrt{h_1}+\sqrt{h_2})
-]
-
+$$
 with heights in meters and distance in km.
 
 ## Valid Conditions
@@ -346,10 +333,9 @@ Signal scattered by atmospheric turbulence.
 
 Empirical analytic form:
 
-[
+$$
 L = A + 30\log_{10}(d) + 10\log_{10}(f)
-]
-
+$$
 Derived from first-order scattering theory.
 
 ## Valid Conditions
@@ -404,4 +390,3 @@ Received Power =
 ```
 
 Each term comes from an **analytic closed-form model**.
-

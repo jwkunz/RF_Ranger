@@ -341,3 +341,14 @@
 - Known Issues / Next Focus:
   - Single-file output size increased significantly due to bundled markdown/math rendering dependencies.
 - Commit: this commit (`milestone(M25): render propagation guide markdown+latex v0.26.0`)
+
+## M26 - Models.md Math Delimiter Normalization
+- Date: 2026-03-07
+- Version: 0.27.0
+- Completed:
+  - Updated `docs/Models.md` display equations from bracket blocks to standard `$$...$$` delimiters.
+  - Converted non-rendered inline symbol annotations to inline math (`$...$`) for consistency.
+  - Verified propagation guide panel still renders directly from `docs/Models.md` as the single source of truth.
+- Known Issues / Next Focus:
+  - Optional: further normalize plain-text engineering expressions in prose into inline math for full consistency.
+- Commit: this commit (`milestone(M26): normalize models markdown math delimiters v0.27.0`)
