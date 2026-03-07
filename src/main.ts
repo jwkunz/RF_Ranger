@@ -22,6 +22,7 @@ import type {
   RadioSink,
   RadioSource,
   ResultRun,
+  SavedSiteView,
   SimulationQueueItem,
   SimulationResultRow,
   Site,
@@ -204,13 +205,14 @@ let sitePaneWidthPx: number | null = null;
 let progress: ProgressState = { running: false, completed: 0, total: 0, message: 'Idle' };
 let focusedReportQueueItemId = '';
 let selectedResultRunId = '';
-let reportIncludeMap = true;
+let reportIncludeSavedSiteView = true;
 let reportIncludeTxRadio = true;
 let reportIncludeTxAntenna = true;
 let reportIncludePropagationModel = true;
 let reportIncludeRxAntenna = true;
 let reportIncludeRxRadio = true;
 let selectedReportFieldIds = new Set<string>(RESULT_FIELD_OPTIONS.map((entry) => entry.id));
+let selectedSavedSiteViewId = '';
 
 const app = requireAppRoot();
 
@@ -310,6 +312,21 @@ function renderSitesTab(): string {
       </tr>`;
     })
     .join('');
+  const savedViewRows = workspace.savedSiteViews
+    .map((view, index) => {
+      const stamp = new Date(view.createdAtIso).toLocaleString();
+      const selectedClass = view.id === selectedSavedSiteViewId ? ' class="focus-row"' : '';
+      return `<tr${selectedClass}>
+        <td>${index + 1}</td>
+        <td>${escapeHtml(stamp)}</td>
+        <td><img class="site-view-thumb" src="${view.imageDataUrl}" alt="Saved site view ${index + 1}" /></td>
+        <td>
+          <button data-select-site-view="${view.id}">Select</button>
+          <button data-delete-site-view="${view.id}">Remove</button>
+        </td>
+      </tr>`;
+    })
+    .join('');
 
   return `
     <h2>Sites</h2>
@@ -338,6 +355,7 @@ function renderSitesTab(): string {
         <button id="geocode-site">Geocode Address</button>
         <button id="add-site-address">Geocode + Add Site</button>
         <div class="action-row">
+          <button id="save-site-view">Save Site View</button>
           <button id="export-kml">Export KML</button>
           <label class="import-label">Import KML<input id="import-kml" type="file" accept=".kml,application/vnd.google-earth.kml+xml" /></label>
         </div>
@@ -350,6 +368,16 @@ function renderSitesTab(): string {
         <tbody>${siteRows || '<tr><td colspan="4">No sites yet.</td></tr>'}</tbody>
       </table>
       <p class="muted">Click the map to place a temporary X preview, then add or update a site.</p>
+    </section>
+    <section class="panel">
+      <div class="action-row">
+        <h3>Saved Site Views</h3>
+        <button id="clear-site-views" ${workspace.savedSiteViews.length ? '' : 'disabled'}>Clear All</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Captured</th><th>Preview</th><th>Actions</th></tr></thead>
+        <tbody>${savedViewRows || '<tr><td colspan="4">No saved site views yet.</td></tr>'}</tbody>
+      </table>
     </section>
   `;
 }
@@ -577,10 +605,17 @@ function renderReportsTab(): string {
 
 function renderReportBuilderTab(): string {
   const activeRun = workspace.reportHistory.find((run) => run.id === selectedResultRunId) ?? workspace.reportHistory[0] ?? null;
+  const activeSavedSiteView = workspace.savedSiteViews.find((view) => view.id === selectedSavedSiteViewId) ?? workspace.savedSiteViews[0] ?? null;
   const runOptions = workspace.reportHistory
     .map((run, index) => {
       const stamp = new Date(run.createdAtIso).toLocaleString();
       return `<option value="${run.id}" ${run.id === activeRun?.id ? 'selected' : ''}>Run ${index + 1} - ${escapeHtml(stamp)} (${run.rows.length} rows)</option>`;
+    })
+    .join('');
+  const savedSiteViewOptions = workspace.savedSiteViews
+    .map((view, index) => {
+      const stamp = new Date(view.createdAtIso).toLocaleString();
+      return `<option value="${view.id}" ${view.id === activeSavedSiteView?.id ? 'selected' : ''}>View ${index + 1} - ${escapeHtml(stamp)}</option>`;
     })
     .join('');
 
@@ -595,7 +630,10 @@ function renderReportBuilderTab(): string {
       <label>Result Run
         <select id="report-run-select">${runOptions || '<option value="">No results available</option>'}</select>
       </label>
-      <label class="inline-check"><input id="report-include-map" type="checkbox" ${reportIncludeMap ? 'checked' : ''}/> Include current map view render</label>
+      <label class="inline-check"><input id="report-include-saved-site-view" type="checkbox" ${reportIncludeSavedSiteView ? 'checked' : ''}/> Include saved site view</label>
+      <label>Saved Site View
+        <select id="report-saved-site-view-select">${savedSiteViewOptions || '<option value="">No saved site views available</option>'}</select>
+      </label>
       <label class="inline-check"><input id="report-include-tx-radio" type="checkbox" ${reportIncludeTxRadio ? 'checked' : ''}/> Include TX Radio Information</label>
       <label class="inline-check"><input id="report-include-tx-antenna" type="checkbox" ${reportIncludeTxAntenna ? 'checked' : ''}/> Include TX Antenna Information</label>
       <label class="inline-check"><input id="report-include-propagation" type="checkbox" ${reportIncludePropagationModel ? 'checked' : ''}/> Include Propagation Model Information</label>
@@ -977,6 +1015,23 @@ function wireSitesEvents(): void {
     exportSitesKml(workspace.sites);
   });
 
+  document.querySelector<HTMLButtonElement>('#save-site-view')?.addEventListener('click', async () => {
+    const imageDataUrl = captureMapSnapshot();
+    if (!imageDataUrl) {
+      alert('Map snapshot unavailable. Ensure the Sites map is loaded before saving a view.');
+      return;
+    }
+    const savedView: SavedSiteView = {
+      id: uid(),
+      createdAtIso: new Date().toISOString(),
+      imageDataUrl
+    };
+    workspace.savedSiteViews.unshift(savedView);
+    selectedSavedSiteViewId = savedView.id;
+    await saveWorkspace(workspace);
+    render();
+  });
+
   document.querySelector<HTMLInputElement>('#import-kml')?.addEventListener('change', async (event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) {
@@ -1012,6 +1067,32 @@ function wireSitesEvents(): void {
       selectedSiteId = button.dataset.selectSite ?? '';
       render();
     });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-select-site-view]').forEach((button) => {
+    button.addEventListener('click', () => {
+      selectedSavedSiteViewId = button.dataset.selectSiteView ?? '';
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-delete-site-view]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const id = button.dataset.deleteSiteView ?? '';
+      workspace.savedSiteViews = workspace.savedSiteViews.filter((view) => view.id !== id);
+      if (selectedSavedSiteViewId === id) {
+        selectedSavedSiteViewId = workspace.savedSiteViews[0]?.id ?? '';
+      }
+      await saveWorkspace(workspace);
+      render();
+    });
+  });
+
+  document.querySelector<HTMLButtonElement>('#clear-site-views')?.addEventListener('click', async () => {
+    workspace.savedSiteViews = [];
+    selectedSavedSiteViewId = '';
+    await saveWorkspace(workspace);
+    render();
   });
 
   initMap();
@@ -1117,8 +1198,12 @@ function wireReportsEvents(): void {
 
 function wireReportBuilderEvents(): void {
   const runSelect = document.querySelector<HTMLSelectElement>('#report-run-select');
+  const savedSiteViewSelect = document.querySelector<HTMLSelectElement>('#report-saved-site-view-select');
   runSelect?.addEventListener('change', () => {
     selectedResultRunId = runSelect.value;
+  });
+  savedSiteViewSelect?.addEventListener('change', () => {
+    selectedSavedSiteViewId = savedSiteViewSelect.value;
   });
 
   document.querySelectorAll<HTMLInputElement>('[data-report-field]').forEach((input) => {
@@ -1150,8 +1235,8 @@ function wireReportBuilderEvents(): void {
     input?.addEventListener('change', () => setter(input.checked));
   };
 
-  bindToggle('#report-include-map', (checked) => {
-    reportIncludeMap = checked;
+  bindToggle('#report-include-saved-site-view', (checked) => {
+    reportIncludeSavedSiteView = checked;
   });
   bindToggle('#report-include-tx-radio', (checked) => {
     reportIncludeTxRadio = checked;
@@ -1223,20 +1308,20 @@ async function generatePdfReport(): Promise<void> {
   writeWrapped(`Result Run Time: ${new Date(activeRun.createdAtIso).toLocaleString()}`);
   y += 8;
 
-  if (reportIncludeMap) {
-    writeHeader('Map View Render');
-    const mapDataUrl = captureMapSnapshot();
-    if (mapDataUrl) {
+  if (reportIncludeSavedSiteView) {
+    writeHeader('Saved Site View');
+    const savedSiteView = workspace.savedSiteViews.find((view) => view.id === selectedSavedSiteViewId) ?? workspace.savedSiteViews[0] ?? null;
+    if (savedSiteView?.imageDataUrl) {
       const imageWidth = pageWidth - margin * 2;
       const imageHeight = Math.min(220, imageWidth * 0.6);
       if (y + imageHeight > pageHeight - 40) {
         doc.addPage();
         y = margin;
       }
-      doc.addImage(mapDataUrl, 'PNG', margin, y, imageWidth, imageHeight);
+      doc.addImage(savedSiteView.imageDataUrl, 'PNG', margin, y, imageWidth, imageHeight);
       y += imageHeight + 10;
     } else {
-      writeWrapped('Map capture unavailable in this browser context. Open the Sites tab first, then regenerate.');
+      writeWrapped('No saved site view selected. Save a site view in the Sites tab before generating.');
     }
     y += 8;
   }
@@ -1941,6 +2026,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     preferences?: WorkspaceSnapshot['preferences'];
     reportHistory?: Array<{ id?: string; createdAtIso?: string; rows?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }> }>;
     reportLatest?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }>;
+    savedSiteViews?: Array<SavedSiteView & { id?: string; createdAtIso?: string; imageDataUrl?: string }>;
   };
 
   const preferences = {
@@ -2045,6 +2131,14 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     rxAntennaId: item.rxAntennaId ?? ''
   }));
 
+  const savedSiteViews = (work.savedSiteViews ?? [])
+    .filter((view) => typeof view.imageDataUrl === 'string' && view.imageDataUrl.startsWith('data:image/'))
+    .map((view) => ({
+      id: view.id ?? uid(),
+      createdAtIso: view.createdAtIso ?? new Date().toISOString(),
+      imageDataUrl: view.imageDataUrl as string
+    }));
+
   return {
     schemaVersion: 1,
     sources,
@@ -2055,7 +2149,8 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     simulationQueue,
     preferences,
     reportLatest,
-    reportHistory
+    reportHistory,
+    savedSiteViews
   };
 }
 
@@ -2086,6 +2181,9 @@ function ensureSelectionDefaults(): void {
   }
   if (!workspace.reportHistory.some((entry) => entry.id === selectedResultRunId)) {
     selectedResultRunId = workspace.reportHistory[0]?.id ?? '';
+  }
+  if (!workspace.savedSiteViews.some((entry) => entry.id === selectedSavedSiteViewId)) {
+    selectedSavedSiteViewId = workspace.savedSiteViews[0]?.id ?? '';
   }
 }
 

@@ -335,6 +335,14 @@ fieldset.param-grid {
   white-space: nowrap;
 }
 
+.site-view-thumb {
+  width: 140px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #94a3b8;
+}
+
 .pending-site-marker {
   color: #f59e0b;
   font-size: 1.5rem;

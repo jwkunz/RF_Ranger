@@ -21,6 +21,7 @@ RF Ranger is a browser-based RF experimentation planning tool for modeling radio
   - Define sites only (name, coordinates, pin color).
   - Add/update sites by map click, coordinate entry, or address geocoding.
   - List all sites below map; selecting a site populates right-side property editor.
+  - Allow saving rendered site-map viewport snapshots into a removable/clearable queue.
 - Simulation tab scope:
   - Five-column simulation definition:
     - Transmitter Site
@@ -32,6 +33,7 @@ RF Ranger is a browser-based RF experimentation planning tool for modeling radio
   - Launch all queued simulations as a batch.
 - Results tab shows buffered simulation queue runs; user can remove individual runs or clear all.
 - Report tab generates downloadable PDF reports from selected result run data.
+- Report tab can include a selected saved site-view snapshot section.
 
 ## Persistence and Data Exchange
 - Persistent browser storage via IndexedDB.

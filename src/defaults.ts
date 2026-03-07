@@ -14,5 +14,6 @@ export const DEFAULT_WORKSPACE: WorkspaceSnapshot = {
     distanceUnit: 'km'
   },
   reportLatest: [],
-  reportHistory: []
+  reportHistory: [],
+  savedSiteViews: []
 };

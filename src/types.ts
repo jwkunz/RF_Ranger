@@ -127,6 +127,12 @@ export interface ResultRun {
   rows: SimulationResultRow[];
 }
 
+export interface SavedSiteView {
+  id: string;
+  createdAtIso: string;
+  imageDataUrl: string;
+}
+
 export interface Preferences {
   theme: ThemeMode;
   powerUnit: PowerUnit;
@@ -144,4 +150,5 @@ export interface WorkspaceSnapshot {
   preferences: Preferences;
   reportLatest: SimulationResultRow[];
   reportHistory: ResultRun[];
+  savedSiteViews: SavedSiteView[];
 }

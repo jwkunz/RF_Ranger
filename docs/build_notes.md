@@ -450,3 +450,16 @@
 - Known Issues / Next Focus:
   - Optional: add explicit validation messaging for legacy queue rows that lack antenna bindings until user re-saves them.
 - Commit: this commit (`milestone(M33): antenna-driven propagation heights v0.34.0`)
+
+## M34 - Saved Site Views Queue + Report Inclusion
+- Date: 2026-03-07
+- Version: 0.35.0
+- Completed:
+  - Added `Save Site View` action in Sites tab to capture current map viewport render as an image snapshot.
+  - Added saved site view queue in Sites tab with thumbnail preview, per-entry remove, selection, and clear-all controls.
+  - Added persistent `savedSiteViews` workspace state with migration-safe normalization defaults.
+  - Updated Report tab option from live map capture to include selected saved site view.
+  - Added saved site view selector in Report tab for choosing snapshot to embed in PDF output.
+- Known Issues / Next Focus:
+  - Saved snapshots are stored as data URLs and can increase workspace size for large numbers of captures.
+- Commit: this commit (`milestone(M34): saved site views and report integration v0.35.0`)

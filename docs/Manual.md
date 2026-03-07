@@ -5,6 +5,7 @@ On launch, RF Ranger displays a splash screen with project branding and legal no
 
 ## 2. Tab Overview
 - **Sites**: Define named geographic sites (coordinates/address) and pin color.
+- **Sites**: Define named geographic sites (coordinates/address) and pin color, and save viewport snapshots for reporting.
 - **Radios**: Manage source/sink radio definitions.
 - **Antennas**: Manage antenna models.
 - **Propagation Models**: Manage model presets.
@@ -23,7 +24,8 @@ On launch, RF Ranger displays a splash screen with project branding and legal no
 5. In Simulation, add one or more queue rows selecting TX site/source radio/TX antenna/propagation model/RX site/receiver radio/RX antenna.
 6. Launch Simulations.
 6. Review output in Results and export CSV if needed.
-7. Use Report to generate a PDF with selected sections/fields.
+7. In Sites, use `Save Site View` to store map snapshots if needed for reports.
+8. Use Report to generate a PDF with selected sections/fields, including a saved site view.
 
 ## 4. Data Management
 - State is auto-saved to browser IndexedDB.
