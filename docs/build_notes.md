@@ -463,3 +463,24 @@
 - Known Issues / Next Focus:
   - Saved snapshots are stored as data URLs and can increase workspace size for large numbers of captures.
 - Commit: this commit (`milestone(M34): saved site views and report integration v0.35.0`)
+
+## M35 - Report Include Tree + Site View PDF Fix
+- Date: 2026-03-07
+- Version: 0.36.0
+- Completed:
+  - Reorganized Report tab controls into a tree view with Y/N checkboxes:
+    - Simulation Runs
+    - Site Views
+    - Transmit Radio
+    - Transmit Antenna
+    - Propagation Model
+    - Receiver Radio
+    - Receiver Antenna
+  - Added child-field selection under each top-level category, with parent-child checkbox sync behavior.
+  - Updated PDF generation to include only the data selected in the include tree.
+  - Improved saved site view PDF embedding by:
+    - enabling map `preserveDrawingBuffer` for reliable capture
+    - using JPEG snapshots and format-aware `addImage` handling
+- Known Issues / Next Focus:
+  - Single-file bundle size continues to grow as report generation features expand.
+- Commit: this commit (`milestone(M35): report include tree and site-view pdf fix v0.36.0`)

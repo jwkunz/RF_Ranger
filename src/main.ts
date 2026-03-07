@@ -144,6 +144,96 @@ const RESULT_FIELD_OPTIONS: Array<{ id: string; label: string; value: (row: Simu
   { id: 'warnings', label: 'Warnings', value: (row) => row.warnings.join('; ') || 'None' }
 ];
 
+interface ReportTreeField {
+  id: string;
+  label: string;
+}
+
+interface ReportTreeCategory {
+  id: string;
+  label: string;
+  fields: ReportTreeField[];
+}
+
+const REPORT_TREE: ReportTreeCategory[] = [
+  {
+    id: 'simulationRuns',
+    label: 'Simulation Runs',
+    fields: RESULT_FIELD_OPTIONS.map((entry) => ({ id: entry.id, label: entry.label }))
+  },
+  {
+    id: 'siteViews',
+    label: 'Site Views',
+    fields: [
+      { id: 'siteViewImage', label: 'Saved Site View Image' },
+      { id: 'siteViewTimestamp', label: 'Capture Timestamp' }
+    ]
+  },
+  {
+    id: 'transmitRadio',
+    label: 'Transmit Radio',
+    fields: [
+      { id: 'txRadioName', label: 'Name' },
+      { id: 'txRadioComments', label: 'Comments' },
+      { id: 'txRadioPower', label: 'TX Power (dBm)' },
+      { id: 'txRadioFrequency', label: 'Carrier Frequency (MHz)' },
+      { id: 'txRadioBandwidth', label: 'Bandwidth (kHz)' },
+      { id: 'txRadioNoiseFigure', label: 'Noise Figure (dB)' }
+    ]
+  },
+  {
+    id: 'transmitAntenna',
+    label: 'Transmit Antenna',
+    fields: [
+      { id: 'txAntennaName', label: 'Name' },
+      { id: 'txAntennaComments', label: 'Comments' },
+      { id: 'txAntennaHeight', label: 'Height (m)' },
+      { id: 'txAntennaAzimuth', label: 'Azimuth (deg)' },
+      { id: 'txAntennaTilt', label: 'Tilt (deg)' },
+      { id: 'txAntennaPolarization', label: 'Polarization' },
+      { id: 'txAntennaPattern', label: 'Pattern' },
+      { id: 'txAntennaGain', label: 'Gain Override (dB)' }
+    ]
+  },
+  {
+    id: 'propagationModel',
+    label: 'Propagation Model',
+    fields: [
+      { id: 'propModelName', label: 'Name' },
+      { id: 'propModelComments', label: 'Comments' },
+      { id: 'propModelType', label: 'Model Type' },
+      { id: 'propModelParams', label: 'Parameters' }
+    ]
+  },
+  {
+    id: 'receiverRadio',
+    label: 'Receiver Radio',
+    fields: [
+      { id: 'rxRadioName', label: 'Name' },
+      { id: 'rxRadioComments', label: 'Comments' },
+      { id: 'rxRadioFrequency', label: 'Carrier Frequency (MHz)' },
+      { id: 'rxRadioBandwidth', label: 'Bandwidth (kHz)' },
+      { id: 'rxRadioEnvTemp', label: 'Environment Noise Temperature (K)' },
+      { id: 'rxRadioNoiseFigure', label: 'Noise Figure (dB)' },
+      { id: 'rxRadioRequiredSnr', label: 'Required SNR (dB)' }
+    ]
+  },
+  {
+    id: 'receiverAntenna',
+    label: 'Receiver Antenna',
+    fields: [
+      { id: 'rxAntennaName', label: 'Name' },
+      { id: 'rxAntennaComments', label: 'Comments' },
+      { id: 'rxAntennaHeight', label: 'Height (m)' },
+      { id: 'rxAntennaAzimuth', label: 'Azimuth (deg)' },
+      { id: 'rxAntennaTilt', label: 'Tilt (deg)' },
+      { id: 'rxAntennaPolarization', label: 'Polarization' },
+      { id: 'rxAntennaPattern', label: 'Pattern' },
+      { id: 'rxAntennaGain', label: 'Gain Override (dB)' }
+    ]
+  }
+];
+
 interface ProgressState {
   running: boolean;
   completed: number;
@@ -205,14 +295,10 @@ let sitePaneWidthPx: number | null = null;
 let progress: ProgressState = { running: false, completed: 0, total: 0, message: 'Idle' };
 let focusedReportQueueItemId = '';
 let selectedResultRunId = '';
-let reportIncludeSavedSiteView = true;
-let reportIncludeTxRadio = true;
-let reportIncludeTxAntenna = true;
-let reportIncludePropagationModel = true;
-let reportIncludeRxAntenna = true;
-let reportIncludeRxRadio = true;
-let selectedReportFieldIds = new Set<string>(RESULT_FIELD_OPTIONS.map((entry) => entry.id));
 let selectedSavedSiteViewId = '';
+let selectedReportTreeIds = new Set<string>(
+  REPORT_TREE.flatMap((category) => [category.id, ...category.fields.map((field) => field.id)])
+);
 
 const app = requireAppRoot();
 
@@ -619,9 +705,19 @@ function renderReportBuilderTab(): string {
     })
     .join('');
 
-  const resultFieldChecks = RESULT_FIELD_OPTIONS.map((field) => {
-    const checked = selectedReportFieldIds.has(field.id) ? 'checked' : '';
-    return `<label class="inline-check"><input type="checkbox" data-report-field="${field.id}" ${checked}/> ${escapeHtml(field.label)}</label>`;
+  const treeHtml = REPORT_TREE.map((category) => {
+    const categoryChecked = selectedReportTreeIds.has(category.id) ? 'checked' : '';
+    const childrenHtml = category.fields
+      .map((field) => {
+        const checked = selectedReportTreeIds.has(field.id) ? 'checked' : '';
+        return `<label class="report-tree__item report-tree__item--child"><input type="checkbox" data-report-field="${field.id}" ${checked}/> ${escapeHtml(field.label)}</label>`;
+      })
+      .join('');
+    return `
+      <div class="report-tree__node">
+        <label class="report-tree__item report-tree__item--parent"><input type="checkbox" data-report-category="${category.id}" ${categoryChecked}/> ${escapeHtml(category.label)}</label>
+        <div class="report-tree__children">${childrenHtml}</div>
+      </div>`;
   }).join('');
 
   return `
@@ -630,22 +726,16 @@ function renderReportBuilderTab(): string {
       <label>Result Run
         <select id="report-run-select">${runOptions || '<option value="">No results available</option>'}</select>
       </label>
-      <label class="inline-check"><input id="report-include-saved-site-view" type="checkbox" ${reportIncludeSavedSiteView ? 'checked' : ''}/> Include saved site view</label>
       <label>Saved Site View
         <select id="report-saved-site-view-select">${savedSiteViewOptions || '<option value="">No saved site views available</option>'}</select>
       </label>
-      <label class="inline-check"><input id="report-include-tx-radio" type="checkbox" ${reportIncludeTxRadio ? 'checked' : ''}/> Include TX Radio Information</label>
-      <label class="inline-check"><input id="report-include-tx-antenna" type="checkbox" ${reportIncludeTxAntenna ? 'checked' : ''}/> Include TX Antenna Information</label>
-      <label class="inline-check"><input id="report-include-propagation" type="checkbox" ${reportIncludePropagationModel ? 'checked' : ''}/> Include Propagation Model Information</label>
-      <label class="inline-check"><input id="report-include-rx-antenna" type="checkbox" ${reportIncludeRxAntenna ? 'checked' : ''}/> Include RX Antenna Information</label>
-      <label class="inline-check"><input id="report-include-rx-radio" type="checkbox" ${reportIncludeRxRadio ? 'checked' : ''}/> Include RX Radio Information</label>
-      <fieldset class="param-grid">
-        <legend>Simulation Result Fields</legend>
-        ${resultFieldChecks}
+      <fieldset class="report-tree">
+        <legend>Include Tree (Y/N)</legend>
+        ${treeHtml}
       </fieldset>
       <div class="action-row">
-        <button id="report-select-all-fields">Select All Fields</button>
-        <button id="report-clear-fields">Clear Fields</button>
+        <button id="report-select-all-tree">Select All</button>
+        <button id="report-clear-tree">Clear All</button>
         <button id="generate-pdf" class="primary-btn">Generate PDF</button>
       </div>
       <p class="muted">Sections are rendered sequentially in the generated PDF with headers and selected content.</p>
@@ -1206,52 +1296,54 @@ function wireReportBuilderEvents(): void {
     selectedSavedSiteViewId = savedSiteViewSelect.value;
   });
 
-  document.querySelectorAll<HTMLInputElement>('[data-report-field]').forEach((input) => {
+  document.querySelectorAll<HTMLInputElement>('[data-report-category]').forEach((input) => {
     input.addEventListener('change', () => {
-      const fieldId = input.dataset.reportField ?? '';
-      if (!fieldId) {
+      const categoryId = input.dataset.reportCategory ?? '';
+      const category = REPORT_TREE.find((entry) => entry.id === categoryId);
+      if (!category) {
         return;
       }
       if (input.checked) {
-        selectedReportFieldIds.add(fieldId);
+        selectedReportTreeIds.add(category.id);
+        category.fields.forEach((field) => selectedReportTreeIds.add(field.id));
       } else {
-        selectedReportFieldIds.delete(fieldId);
+        selectedReportTreeIds.delete(category.id);
+        category.fields.forEach((field) => selectedReportTreeIds.delete(field.id));
       }
+      render();
     });
   });
 
-  document.querySelector<HTMLButtonElement>('#report-select-all-fields')?.addEventListener('click', () => {
-    selectedReportFieldIds = new Set<string>(RESULT_FIELD_OPTIONS.map((entry) => entry.id));
+  document.querySelectorAll<HTMLInputElement>('[data-report-field]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const fieldId = input.dataset.reportField ?? '';
+      const category = REPORT_TREE.find((entry) => entry.fields.some((field) => field.id === fieldId));
+      if (!fieldId || !category) {
+        return;
+      }
+      if (input.checked) {
+        selectedReportTreeIds.add(fieldId);
+      } else {
+        selectedReportTreeIds.delete(fieldId);
+      }
+      const allChecked = category.fields.every((field) => selectedReportTreeIds.has(field.id));
+      if (allChecked) {
+        selectedReportTreeIds.add(category.id);
+      } else {
+        selectedReportTreeIds.delete(category.id);
+      }
+      render();
+    });
+  });
+
+  document.querySelector<HTMLButtonElement>('#report-select-all-tree')?.addEventListener('click', () => {
+    selectedReportTreeIds = new Set<string>(REPORT_TREE.flatMap((category) => [category.id, ...category.fields.map((field) => field.id)]));
     render();
   });
 
-  document.querySelector<HTMLButtonElement>('#report-clear-fields')?.addEventListener('click', () => {
-    selectedReportFieldIds = new Set<string>();
+  document.querySelector<HTMLButtonElement>('#report-clear-tree')?.addEventListener('click', () => {
+    selectedReportTreeIds = new Set<string>();
     render();
-  });
-
-  const bindToggle = (id: string, setter: (checked: boolean) => void) => {
-    const input = document.querySelector<HTMLInputElement>(id);
-    input?.addEventListener('change', () => setter(input.checked));
-  };
-
-  bindToggle('#report-include-saved-site-view', (checked) => {
-    reportIncludeSavedSiteView = checked;
-  });
-  bindToggle('#report-include-tx-radio', (checked) => {
-    reportIncludeTxRadio = checked;
-  });
-  bindToggle('#report-include-tx-antenna', (checked) => {
-    reportIncludeTxAntenna = checked;
-  });
-  bindToggle('#report-include-propagation', (checked) => {
-    reportIncludePropagationModel = checked;
-  });
-  bindToggle('#report-include-rx-antenna', (checked) => {
-    reportIncludeRxAntenna = checked;
-  });
-  bindToggle('#report-include-rx-radio', (checked) => {
-    reportIncludeRxRadio = checked;
   });
 
   document.querySelector<HTMLButtonElement>('#generate-pdf')?.addEventListener('click', async () => {
@@ -1266,9 +1358,14 @@ async function generatePdfReport(): Promise<void> {
     return;
   }
 
-  const selectedFields = RESULT_FIELD_OPTIONS.filter((field) => selectedReportFieldIds.has(field.id));
-  if (!selectedFields.length) {
-    alert('Select at least one simulation results field for the report.');
+  const categoryEnabled = (categoryId: string): boolean => selectedReportTreeIds.has(categoryId);
+  const selectedFields = RESULT_FIELD_OPTIONS.filter((field) => selectedReportTreeIds.has(field.id));
+  const hasAnySelection = REPORT_TREE.some(
+    (category) => selectedReportTreeIds.has(category.id) || category.fields.some((field) => selectedReportTreeIds.has(field.id))
+  );
+
+  if (!hasAnySelection) {
+    alert('Select at least one item in the report include tree.');
     return;
   }
 
@@ -1308,34 +1405,44 @@ async function generatePdfReport(): Promise<void> {
   writeWrapped(`Result Run Time: ${new Date(activeRun.createdAtIso).toLocaleString()}`);
   y += 8;
 
-  if (reportIncludeSavedSiteView) {
+  if (categoryEnabled('siteViews')) {
     writeHeader('Saved Site View');
     const savedSiteView = workspace.savedSiteViews.find((view) => view.id === selectedSavedSiteViewId) ?? workspace.savedSiteViews[0] ?? null;
-    if (savedSiteView?.imageDataUrl) {
+    if (selectedReportTreeIds.has('siteViewTimestamp') && savedSiteView) {
+      writeWrapped(`Capture Time: ${new Date(savedSiteView.createdAtIso).toLocaleString()}`);
+    }
+    if (selectedReportTreeIds.has('siteViewImage') && savedSiteView?.imageDataUrl) {
       const imageWidth = pageWidth - margin * 2;
       const imageHeight = Math.min(220, imageWidth * 0.6);
       if (y + imageHeight > pageHeight - 40) {
         doc.addPage();
         y = margin;
       }
-      doc.addImage(savedSiteView.imageDataUrl, 'PNG', margin, y, imageWidth, imageHeight);
+      const format = savedSiteView.imageDataUrl.includes('image/jpeg') ? 'JPEG' : 'PNG';
+      doc.addImage(savedSiteView.imageDataUrl, format, margin, y, imageWidth, imageHeight);
       y += imageHeight + 10;
-    } else {
+    } else if (selectedReportTreeIds.has('siteViewImage')) {
       writeWrapped('No saved site view selected. Save a site view in the Sites tab before generating.');
     }
     y += 8;
   }
 
-  writeHeader('Simulation Results');
-  activeRun.rows.forEach((row, index) => {
-    writeWrapped(`Row ${index + 1}`);
-    for (const field of selectedFields) {
-      writeWrapped(`- ${field.label}: ${field.value(row)}`);
+  if (categoryEnabled('simulationRuns')) {
+    writeHeader('Simulation Runs');
+    if (!selectedFields.length) {
+      writeWrapped('Simulation Runs category selected, but no simulation fields are selected.');
+    } else {
+      activeRun.rows.forEach((row, index) => {
+        writeWrapped(`Row ${index + 1}`);
+        for (const field of selectedFields) {
+          writeWrapped(`- ${field.label}: ${field.value(row)}`);
+        }
+        y += 6;
+      });
     }
-    y += 6;
-  });
+  }
 
-  if (reportIncludeTxRadio) {
+  if (categoryEnabled('transmitRadio')) {
     writeHeader('TX Radio Information');
     const txRadios = uniqueBy(activeRun.rows.map((row) => row.transmitterRadio));
     txRadios.forEach((radioName) => {
@@ -1344,11 +1451,18 @@ async function generatePdfReport(): Promise<void> {
         writeWrapped(`- ${radioName}`);
         return;
       }
-      writeWrapped(`- ${entry.name}: ${entry.txPowerDbm} dBm, ${entry.carrierFrequencyMHz} MHz, ${(entry.bandwidthHz / 1000).toFixed(3)} kHz`);
+      const lines: string[] = [];
+      if (selectedReportTreeIds.has('txRadioName')) lines.push(`Name: ${entry.name}`);
+      if (selectedReportTreeIds.has('txRadioComments')) lines.push(`Comments: ${entry.comments || 'None'}`);
+      if (selectedReportTreeIds.has('txRadioPower')) lines.push(`TX Power: ${entry.txPowerDbm} dBm`);
+      if (selectedReportTreeIds.has('txRadioFrequency')) lines.push(`Carrier Frequency: ${entry.carrierFrequencyMHz} MHz`);
+      if (selectedReportTreeIds.has('txRadioBandwidth')) lines.push(`Bandwidth: ${(entry.bandwidthHz / 1000).toFixed(3)} kHz`);
+      if (selectedReportTreeIds.has('txRadioNoiseFigure')) lines.push(`Noise Figure: ${entry.noiseFigureDb} dB`);
+      lines.forEach((line) => writeWrapped(`- ${line}`));
     });
   }
 
-  if (reportIncludeTxAntenna) {
+  if (categoryEnabled('transmitAntenna')) {
     writeHeader('TX Antenna Information');
     const txAntennaIds = uniqueBy(
       activeRun.rows.map((row) => {
@@ -1364,12 +1478,21 @@ async function generatePdfReport(): Promise<void> {
         if (!antenna) {
           return;
         }
-        writeWrapped(`- ${antenna.name}: ${antenna.pattern}, ${antenna.heightM} m, az ${antenna.azimuthDeg} deg, tilt ${antenna.tiltDeg} deg`);
+        const lines: string[] = [];
+        if (selectedReportTreeIds.has('txAntennaName')) lines.push(`Name: ${antenna.name}`);
+        if (selectedReportTreeIds.has('txAntennaComments')) lines.push(`Comments: ${antenna.comments || 'None'}`);
+        if (selectedReportTreeIds.has('txAntennaHeight')) lines.push(`Height: ${antenna.heightM} m`);
+        if (selectedReportTreeIds.has('txAntennaAzimuth')) lines.push(`Azimuth: ${antenna.azimuthDeg} deg`);
+        if (selectedReportTreeIds.has('txAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
+        if (selectedReportTreeIds.has('txAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
+        if (selectedReportTreeIds.has('txAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
+        if (selectedReportTreeIds.has('txAntennaGain')) lines.push(`Gain Override: ${antenna.gainOverrideDb ?? 'default'}`);
+        lines.forEach((line) => writeWrapped(`- ${line}`));
       });
     }
   }
 
-  if (reportIncludePropagationModel) {
+  if (categoryEnabled('propagationModel')) {
     writeHeader('Propagation Model Information');
     const modelIds = uniqueBy(
       activeRun.rows.map((row) => {
@@ -1385,12 +1508,17 @@ async function generatePdfReport(): Promise<void> {
         if (!model) {
           return;
         }
-        writeWrapped(`- ${model.name} (${model.modelType}): ${JSON.stringify(model.parameters)}`);
+        const lines: string[] = [];
+        if (selectedReportTreeIds.has('propModelName')) lines.push(`Name: ${model.name}`);
+        if (selectedReportTreeIds.has('propModelComments')) lines.push(`Comments: ${model.comments || 'None'}`);
+        if (selectedReportTreeIds.has('propModelType')) lines.push(`Model Type: ${model.modelType}`);
+        if (selectedReportTreeIds.has('propModelParams')) lines.push(`Parameters: ${JSON.stringify(model.parameters)}`);
+        lines.forEach((line) => writeWrapped(`- ${line}`));
       });
     }
   }
 
-  if (reportIncludeRxAntenna) {
+  if (categoryEnabled('receiverAntenna')) {
     writeHeader('RX Antenna Information');
     const rxAntennaIds = uniqueBy(
       activeRun.rows.map((row) => {
@@ -1406,12 +1534,21 @@ async function generatePdfReport(): Promise<void> {
         if (!antenna) {
           return;
         }
-        writeWrapped(`- ${antenna.name}: ${antenna.pattern}, ${antenna.heightM} m, az ${antenna.azimuthDeg} deg, tilt ${antenna.tiltDeg} deg`);
+        const lines: string[] = [];
+        if (selectedReportTreeIds.has('rxAntennaName')) lines.push(`Name: ${antenna.name}`);
+        if (selectedReportTreeIds.has('rxAntennaComments')) lines.push(`Comments: ${antenna.comments || 'None'}`);
+        if (selectedReportTreeIds.has('rxAntennaHeight')) lines.push(`Height: ${antenna.heightM} m`);
+        if (selectedReportTreeIds.has('rxAntennaAzimuth')) lines.push(`Azimuth: ${antenna.azimuthDeg} deg`);
+        if (selectedReportTreeIds.has('rxAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
+        if (selectedReportTreeIds.has('rxAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
+        if (selectedReportTreeIds.has('rxAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
+        if (selectedReportTreeIds.has('rxAntennaGain')) lines.push(`Gain Override: ${antenna.gainOverrideDb ?? 'default'}`);
+        lines.forEach((line) => writeWrapped(`- ${line}`));
       });
     }
   }
 
-  if (reportIncludeRxRadio) {
+  if (categoryEnabled('receiverRadio')) {
     writeHeader('RX Radio Information');
     const rxRadios = uniqueBy(activeRun.rows.map((row) => row.receiverRadio));
     rxRadios.forEach((radioName) => {
@@ -1420,9 +1557,15 @@ async function generatePdfReport(): Promise<void> {
         writeWrapped(`- ${radioName}`);
         return;
       }
-      writeWrapped(
-        `- ${entry.name}: ${entry.carrierFrequencyMHz} MHz, ${(entry.bandwidthHz / 1000).toFixed(3)} kHz, NF ${entry.noiseFigureDb} dB, Req SNR ${entry.requiredSnrDb} dB`
-      );
+      const lines: string[] = [];
+      if (selectedReportTreeIds.has('rxRadioName')) lines.push(`Name: ${entry.name}`);
+      if (selectedReportTreeIds.has('rxRadioComments')) lines.push(`Comments: ${entry.comments || 'None'}`);
+      if (selectedReportTreeIds.has('rxRadioFrequency')) lines.push(`Carrier Frequency: ${entry.carrierFrequencyMHz} MHz`);
+      if (selectedReportTreeIds.has('rxRadioBandwidth')) lines.push(`Bandwidth: ${(entry.bandwidthHz / 1000).toFixed(3)} kHz`);
+      if (selectedReportTreeIds.has('rxRadioEnvTemp')) lines.push(`Environment Noise Temperature: ${entry.environmentNoiseTemperatureK} K`);
+      if (selectedReportTreeIds.has('rxRadioNoiseFigure')) lines.push(`Noise Figure: ${entry.noiseFigureDb} dB`);
+      if (selectedReportTreeIds.has('rxRadioRequiredSnr')) lines.push(`Required SNR: ${entry.requiredSnrDb} dB`);
+      lines.forEach((line) => writeWrapped(`- ${line}`));
     });
   }
 
@@ -1436,7 +1579,7 @@ function captureMapSnapshot(): string | null {
   }
   try {
     const canvas = map.getCanvas();
-    return canvas.toDataURL('image/png');
+    return canvas.toDataURL('image/jpeg', 0.9);
   } catch {
     return null;
   }
@@ -1652,7 +1795,8 @@ function initMap(): void {
       layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
     },
     center: initialCenter,
-    zoom: mapZoom
+    zoom: mapZoom,
+    preserveDrawingBuffer: true
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');

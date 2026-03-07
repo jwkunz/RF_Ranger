@@ -11,7 +11,7 @@ On launch, RF Ranger displays a splash screen with project branding and legal no
 - **Propagation Models**: Manage model presets.
 - **Simulation**: Build queue entries (TX site/radio, propagation model, RX site/radio) and launch simulations.
 - **Results**: View buffered simulation results, select/remove runs, and export CSV.
-- **Report**: Generate a downloadable PDF report from selected result run content.
+- **Report**: Generate a downloadable PDF report from selected result run content using an include-tree of categories/fields.
 - **Preferences**: Change theme and units.
 - **Help**: Read this manual.
 - **Legal**: Review licenses, dependencies, and remote-communication disclosures.
@@ -25,7 +25,7 @@ On launch, RF Ranger displays a splash screen with project branding and legal no
 6. Launch Simulations.
 6. Review output in Results and export CSV if needed.
 7. In Sites, use `Save Site View` to store map snapshots if needed for reports.
-8. Use Report to generate a PDF with selected sections/fields, including a saved site view.
+8. Use Report include-tree checkboxes to select categories/fields, then generate the PDF (optionally including a saved site view).
 
 ## 4. Data Management
 - State is auto-saved to browser IndexedDB.
