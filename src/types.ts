@@ -131,6 +131,7 @@ export interface SavedSiteView {
   id: string;
   createdAtIso: string;
   imageDataUrl: string;
+  fileName: string;
 }
 
 export interface Preferences {

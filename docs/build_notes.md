@@ -509,3 +509,15 @@
 - Known Issues / Next Focus:
   - If no tooltip/popup is currently visible on screen at capture time, it will not appear in the saved snapshot (WYSIWYG behavior).
 - Commit: this commit (`milestone(M37): exact site view capture with overlays v0.38.0`)
+
+## M38 - PNG Site Screenshot UX + X Marker Toggle
+- Date: 2026-03-07
+- Version: 0.39.0
+- Completed:
+  - Updated `Save Site View` to capture the live Sites map viewport and immediately download a PNG file (`site-view-<timestamp>.png`) at save time.
+  - Persisted screenshot filename metadata with saved site views for consistent export naming.
+  - Made `Save Site View` prominent at the top of the Sites property pane with larger primary-button styling.
+  - Added `View X Marker` checkbox (default enabled) to control visibility of the temporary click marker without clearing selected coordinates.
+- Known Issues / Next Focus:
+  - Browser capture remains dependent on map tile CORS availability for PNG export success.
+- Commit: this commit (`milestone(M38): site screenshot png save and x-marker controls v0.39.0`)

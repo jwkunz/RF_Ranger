@@ -81,6 +81,12 @@ body {
   font-weight: 600;
 }
 
+.primary-btn--large {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+}
+
 .shell {
   min-height: 100vh;
 }
@@ -250,6 +256,15 @@ fieldset.param-grid {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+}
+
+.site-view-controls {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  border: 1px solid #64748b;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.08);
 }
 
 .report-tree {

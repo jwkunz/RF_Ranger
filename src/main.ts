@@ -298,6 +298,7 @@ let focusedReportQueueItemId = '';
 let selectedResultRunId = '';
 let selectedSavedSiteViewId = '';
 let visibleResultRunIds = new Set<string>();
+let showPendingXMarker = true;
 let selectedReportTreeIds = new Set<string>(
   REPORT_TREE.flatMap((category) => [category.id, ...category.fields.map((field) => field.id)])
 );
@@ -425,6 +426,10 @@ function renderSitesTab(): string {
       <div id="map-resizer" class="map-resizer" role="separator" aria-orientation="vertical" aria-label="Resize map panel"></div>
       <aside class="panel stack map-controls map-controls--right">
         <h3>Site Properties</h3>
+        <div class="site-view-controls">
+          <button id="save-site-view" class="primary-btn primary-btn--large">Save Site View</button>
+          <label class="inline-check"><input id="toggle-x-marker" type="checkbox" ${showPendingXMarker ? 'checked' : ''}/> View X Marker</label>
+        </div>
         <label>Name<input id="site-name" value="${escapeHtml(selectedSite?.name ?? '')}" placeholder="Site name" /></label>
         <label>Pin Color
           <select id="site-color">${colorOptions}</select>
@@ -443,7 +448,6 @@ function renderSitesTab(): string {
         <button id="geocode-site">Geocode Address</button>
         <button id="add-site-address">Geocode + Add Site</button>
         <div class="action-row">
-          <button id="save-site-view">Save Site View</button>
           <button id="export-kml">Export KML</button>
           <label class="import-label">Import KML<input id="import-kml" type="file" accept=".kml,application/vnd.google-earth.kml+xml" /></label>
         </div>
@@ -1124,7 +1128,8 @@ function wireSitesEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('#save-site-view')?.addEventListener('click', async () => {
-    const imageDataUrl = await captureMapSnapshot();
+    const snapshot = await captureMapSnapshot();
+    const imageDataUrl = snapshot?.dataUrl ?? null;
     if (!imageDataUrl) {
       alert('Map snapshot unavailable. Ensure the Sites map is loaded before saving a view.');
       return;
@@ -1132,12 +1137,30 @@ function wireSitesEvents(): void {
     const savedView: SavedSiteView = {
       id: uid(),
       createdAtIso: new Date().toISOString(),
-      imageDataUrl
+      imageDataUrl,
+      fileName: snapshot?.fileName ?? defaultSiteViewFileName()
     };
     workspace.savedSiteViews.unshift(savedView);
     selectedSavedSiteViewId = savedView.id;
     await saveWorkspace(workspace);
+    downloadDataUrl(savedView.imageDataUrl, savedView.fileName);
     render();
+  });
+
+  document.querySelector<HTMLInputElement>('#toggle-x-marker')?.addEventListener('change', () => {
+    const checked = document.querySelector<HTMLInputElement>('#toggle-x-marker')?.checked ?? true;
+    showPendingXMarker = checked;
+    if (!showPendingXMarker && pendingClickMarker) {
+      pendingClickMarker.remove();
+      pendingClickMarker = null;
+    }
+    if (showPendingXMarker) {
+      const lat = Number.parseFloat(document.querySelector<HTMLInputElement>('#site-lat')?.value ?? '');
+      const lon = Number.parseFloat(document.querySelector<HTMLInputElement>('#site-lon')?.value ?? '');
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        renderPendingClickMarker(lat, lon);
+      }
+    }
   });
 
   document.querySelector<HTMLInputElement>('#import-kml')?.addEventListener('change', async (event) => {
@@ -1611,7 +1634,7 @@ async function generatePdfReport(): Promise<void> {
   doc.save(`rf-ranger-report-${stamp}.pdf`);
 }
 
-async function captureMapSnapshot(): Promise<string | null> {
+async function captureMapSnapshot(): Promise<{ dataUrl: string; fileName: string } | null> {
   const container = document.querySelector<HTMLElement>('#map-canvas');
   if (!container) {
     return null;
@@ -1623,7 +1646,8 @@ async function captureMapSnapshot(): Promise<string | null> {
       logging: false,
       scale: 1
     });
-    return canvas.toDataURL('image/jpeg', 0.92);
+    const dataUrl = canvas.toDataURL('image/png');
+    return { dataUrl, fileName: defaultSiteViewFileName() };
   } catch {
     return null;
   }
@@ -1855,7 +1879,9 @@ function initMap(): void {
       latInput.value = String(lat);
       lonInput.value = String(lon);
     }
-    renderPendingClickMarker(lat, lon);
+    if (showPendingXMarker) {
+      renderPendingClickMarker(lat, lon);
+    }
   });
 
   map.on('moveend', () => {
@@ -1896,7 +1922,7 @@ function initMap(): void {
   });
 
   const selectedForPending = workspace.sites.find((site) => site.id === selectedSiteId);
-  if (selectedForPending) {
+  if (selectedForPending && showPendingXMarker) {
     renderPendingClickMarker(selectedForPending.latitude, selectedForPending.longitude);
   } else if (pendingClickMarker) {
     pendingClickMarker.remove();
@@ -1905,7 +1931,7 @@ function initMap(): void {
 }
 
 function renderPendingClickMarker(lat: number, lon: number): void {
-  if (!map) {
+  if (!map || !showPendingXMarker) {
     return;
   }
   if (pendingClickMarker) {
@@ -2215,7 +2241,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     preferences?: WorkspaceSnapshot['preferences'];
     reportHistory?: Array<{ id?: string; createdAtIso?: string; rows?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }> }>;
     reportLatest?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }>;
-    savedSiteViews?: Array<SavedSiteView & { id?: string; createdAtIso?: string; imageDataUrl?: string }>;
+    savedSiteViews?: Array<SavedSiteView & { id?: string; createdAtIso?: string; imageDataUrl?: string; fileName?: string }>;
   };
 
   const preferences = {
@@ -2325,7 +2351,8 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     .map((view) => ({
       id: view.id ?? uid(),
       createdAtIso: view.createdAtIso ?? new Date().toISOString(),
-      imageDataUrl: view.imageDataUrl as string
+      imageDataUrl: view.imageDataUrl as string,
+      fileName: view.fileName ?? defaultSiteViewFileName()
     }));
 
   return {
@@ -2448,6 +2475,18 @@ function getVisibleResultRuns(): ResultRun[] {
     return [workspace.reportHistory[0]];
   }
   return [];
+}
+
+function defaultSiteViewFileName(): string {
+  const stamp = new Date().toISOString().replaceAll(':', '-');
+  return `site-view-${stamp}.png`;
+}
+
+function downloadDataUrl(dataUrl: string, fileName: string): void {
+  const anchor = document.createElement('a');
+  anchor.href = dataUrl;
+  anchor.download = fileName;
+  anchor.click();
 }
 
 function renderManualWithToc(markdown: string): { tocHtml: string; bodyHtml: string } {
