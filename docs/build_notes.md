@@ -552,3 +552,19 @@
 - Known Issues / Next Focus:
   - Simulation queue comments are currently single-line text; optional future enhancement is expanded multiline notes.
 - Commit: this commit (`milestone(M40): comments reflow and simulation comment reporting v0.41.0`)
+
+## M41 - Guided Site View Capture + PNG Toggle + Base Map Layers
+- Date: 2026-03-07
+- Version: 0.42.0
+- Completed:
+  - Updated `Save Site View` to open a guided capture overlay on the map where users drag-select a specific region before saving.
+  - Added cropped capture support so selected region is saved into cached site views instead of always capturing full viewport.
+  - Added `Save View as PNG` checkbox (default off) next to `View X Marker`; controls whether captures are also downloaded to local filesystem.
+  - Added selectable Sites map layers:
+    - Street (OSM)
+    - Topographic (OpenTopoMap)
+    - Geographic (CyclOSM)
+  - Map now initializes with the currently selected base layer.
+- Known Issues / Next Focus:
+  - Remote tile providers may have occasional availability/rate limits that affect map rendering.
+- Commit: this commit (`milestone(M41): guided capture and selectable basemap layers v0.42.0`)

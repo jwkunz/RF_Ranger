@@ -68,6 +68,13 @@ const SITE_COLOR_OPTIONS = [
   { label: 'White', value: '#ffffff' }
 ] as const;
 
+const BASE_MAP_OPTIONS = [
+  { id: 'street', label: 'Street' },
+  { id: 'topographic', label: 'Topographic' },
+  { id: 'geographic', label: 'Geographic' }
+] as const;
+type BaseMapId = (typeof BASE_MAP_OPTIONS)[number]['id'];
+
 const propagationParameterMeta: Record<
   PropagationModelType,
   Record<string, { label: string; symbol: string; units?: string; description: string }>
@@ -301,6 +308,8 @@ let selectedResultRunId = '';
 let selectedSavedSiteViewId = '';
 let visibleResultRunIds = new Set<string>();
 let showPendingXMarker = true;
+let saveSiteViewAsPng = false;
+let selectedBaseMapId: BaseMapId = 'street';
 let selectedReportTreeIds = new Set<string>(
   REPORT_TREE.flatMap((category) => [category.id, ...category.fields.map((field) => field.id)])
 );
@@ -392,6 +401,9 @@ function renderSitesTab(): string {
     ),
     ...(hasCustomColor && selectedSite ? [`<option value="${selectedSite.pinColor}" selected>Custom (${selectedSite.pinColor})</option>`] : [])
   ].join('');
+  const baseMapOptions = BASE_MAP_OPTIONS.map(
+    (entry) => `<option value="${entry.id}" ${selectedBaseMapId === entry.id ? 'selected' : ''}>${entry.label}</option>`
+  ).join('');
   const siteRows = workspace.sites
     .map((site) => {
       const selectedClass = site.id === selectedSiteId ? ' class="focus-row"' : '';
@@ -431,6 +443,10 @@ function renderSitesTab(): string {
         <div class="site-view-controls">
           <button id="save-site-view" class="primary-btn primary-btn--large">Save Site View</button>
           <label class="inline-check"><input id="toggle-x-marker" type="checkbox" ${showPendingXMarker ? 'checked' : ''}/> View X Marker</label>
+          <label class="inline-check"><input id="toggle-save-site-view-png" type="checkbox" ${saveSiteViewAsPng ? 'checked' : ''}/> Save View as PNG</label>
+          <label>Map Layer
+            <select id="site-map-layer">${baseMapOptions}</select>
+          </label>
         </div>
         <label>Name<input id="site-name" value="${escapeHtml(selectedSite?.name ?? '')}" placeholder="Site name" /></label>
         <label>Pin Color
@@ -1105,7 +1121,16 @@ function wireSitesEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('#save-site-view')?.addEventListener('click', async () => {
-    const snapshot = await captureMapSnapshot();
+    const mapCanvas = document.querySelector<HTMLElement>('#map-canvas');
+    if (!mapCanvas) {
+      alert('Map unavailable. Open the Sites map before saving a site view.');
+      return;
+    }
+    const crop = await promptMapCaptureRegion(mapCanvas);
+    if (!crop) {
+      return;
+    }
+    const snapshot = await captureMapSnapshot(crop);
     const imageDataUrl = snapshot?.dataUrl ?? null;
     if (!imageDataUrl) {
       alert('Map snapshot unavailable. Ensure the Sites map is loaded before saving a view.');
@@ -1120,7 +1145,9 @@ function wireSitesEvents(): void {
     workspace.savedSiteViews.unshift(savedView);
     selectedSavedSiteViewId = savedView.id;
     await saveWorkspace(workspace);
-    downloadDataUrl(savedView.imageDataUrl, savedView.fileName);
+    if (saveSiteViewAsPng) {
+      downloadDataUrl(savedView.imageDataUrl, savedView.fileName);
+    }
     render();
   });
 
@@ -1138,6 +1165,19 @@ function wireSitesEvents(): void {
         renderPendingClickMarker(lat, lon);
       }
     }
+  });
+
+  document.querySelector<HTMLInputElement>('#toggle-save-site-view-png')?.addEventListener('change', () => {
+    saveSiteViewAsPng = document.querySelector<HTMLInputElement>('#toggle-save-site-view-png')?.checked ?? false;
+  });
+
+  document.querySelector<HTMLSelectElement>('#site-map-layer')?.addEventListener('change', () => {
+    const nextValue = document.querySelector<HTMLSelectElement>('#site-map-layer')?.value as BaseMapId | undefined;
+    if (!nextValue || nextValue === selectedBaseMapId) {
+      return;
+    }
+    selectedBaseMapId = nextValue;
+    render();
   });
 
   document.querySelector<HTMLInputElement>('#import-kml')?.addEventListener('change', async (event) => {
@@ -1610,7 +1650,14 @@ async function generatePdfReport(): Promise<void> {
   doc.save(`rf-ranger-report-${stamp}.pdf`);
 }
 
-async function captureMapSnapshot(): Promise<{ dataUrl: string; fileName: string } | null> {
+interface CropRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+async function captureMapSnapshot(cropRegion?: CropRegion): Promise<{ dataUrl: string; fileName: string } | null> {
   const container = document.querySelector<HTMLElement>('#map-canvas');
   if (!container) {
     return null;
@@ -1622,11 +1669,138 @@ async function captureMapSnapshot(): Promise<{ dataUrl: string; fileName: string
       logging: false,
       scale: 1
     });
-    const dataUrl = canvas.toDataURL('image/png');
+    const clippedCanvas = cropRegion ? cropCanvas(canvas, cropRegion) : canvas;
+    const dataUrl = clippedCanvas.toDataURL('image/png');
     return { dataUrl, fileName: defaultSiteViewFileName() };
   } catch {
     return null;
   }
+}
+
+function cropCanvas(canvas: HTMLCanvasElement, cropRegion: CropRegion): HTMLCanvasElement {
+  const sx = Math.max(0, Math.floor(cropRegion.x));
+  const sy = Math.max(0, Math.floor(cropRegion.y));
+  const maxWidth = Math.max(1, canvas.width - sx);
+  const maxHeight = Math.max(1, canvas.height - sy);
+  const sw = Math.max(1, Math.min(Math.floor(cropRegion.width), maxWidth));
+  const sh = Math.max(1, Math.min(Math.floor(cropRegion.height), maxHeight));
+  const output = document.createElement('canvas');
+  output.width = sw;
+  output.height = sh;
+  const context = output.getContext('2d');
+  if (context) {
+    context.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+  }
+  return output;
+}
+
+async function promptMapCaptureRegion(container: HTMLElement): Promise<CropRegion | null> {
+  return await new Promise((resolve) => {
+    const originalPosition = container.style.position;
+    if (!originalPosition || originalPosition === 'static') {
+      container.style.position = 'relative';
+    }
+    map?.boxZoom.disable();
+    map?.dragPan.disable();
+    map?.doubleClickZoom.disable();
+    map?.scrollZoom.disable();
+    map?.keyboard.disable();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'capture-overlay';
+    const instruction = document.createElement('div');
+    instruction.className = 'capture-overlay__instruction';
+    instruction.textContent = 'Drag on the map to select the site view region.';
+    const toolbar = document.createElement('div');
+    toolbar.className = 'capture-overlay__toolbar';
+    const confirmButton = document.createElement('button');
+    confirmButton.textContent = 'Save Selection';
+    confirmButton.disabled = true;
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = 'Cancel';
+    toolbar.append(confirmButton, cancelButton);
+    const selection = document.createElement('div');
+    selection.className = 'capture-overlay__selection';
+    overlay.append(instruction, toolbar, selection);
+    container.append(overlay);
+
+    let startX = 0;
+    let startY = 0;
+    let isDragging = false;
+    let hasSelection = false;
+    let region: CropRegion | null = null;
+
+    const cleanup = () => {
+      overlay.remove();
+      map?.boxZoom.enable();
+      map?.dragPan.enable();
+      map?.doubleClickZoom.enable();
+      map?.scrollZoom.enable();
+      map?.keyboard.enable();
+      if (!originalPosition || originalPosition === 'static') {
+        container.style.position = originalPosition;
+      }
+    };
+
+    const updateSelection = (x: number, y: number) => {
+      const left = Math.min(startX, x);
+      const top = Math.min(startY, y);
+      const width = Math.abs(x - startX);
+      const height = Math.abs(y - startY);
+      selection.style.left = `${left}px`;
+      selection.style.top = `${top}px`;
+      selection.style.width = `${width}px`;
+      selection.style.height = `${height}px`;
+      region = { x: left, y: top, width, height };
+      hasSelection = width >= 8 && height >= 8;
+      confirmButton.disabled = !hasSelection;
+    };
+
+    overlay.addEventListener('pointerdown', (event) => {
+      if ((event.target as HTMLElement).closest('.capture-overlay__toolbar')) {
+        return;
+      }
+      const rect = overlay.getBoundingClientRect();
+      startX = event.clientX - rect.left;
+      startY = event.clientY - rect.top;
+      isDragging = true;
+      hasSelection = false;
+      confirmButton.disabled = true;
+      updateSelection(startX, startY);
+      selection.style.display = 'block';
+      overlay.setPointerCapture(event.pointerId);
+    });
+
+    overlay.addEventListener('pointermove', (event) => {
+      if (!isDragging) {
+        return;
+      }
+      const rect = overlay.getBoundingClientRect();
+      const x = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+      const y = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+      updateSelection(x, y);
+    });
+
+    overlay.addEventListener('pointerup', (event) => {
+      if (isDragging) {
+        isDragging = false;
+        overlay.releasePointerCapture(event.pointerId);
+      }
+    });
+
+    confirmButton.addEventListener('click', () => {
+      if (!region || !hasSelection) {
+        return;
+      }
+      cleanup();
+      resolve(region);
+    });
+
+    cancelButton.addEventListener('click', () => {
+      cleanup();
+      resolve(null);
+    });
+  });
 }
 
 async function addSimulationQueueItem(): Promise<void> {
@@ -1813,6 +1987,53 @@ async function updateSelectedSiteFromForm(): Promise<void> {
   render();
 }
 
+function buildBaseMapStyle(baseMapId: BaseMapId): maplibregl.StyleSpecification {
+  if (baseMapId === 'topographic') {
+    return {
+      version: 8,
+      sources: {
+        base: {
+          type: 'raster',
+          tiles: ['https://a.tile.opentopomap.org/{z}/{x}/{y}.png', 'https://b.tile.opentopomap.org/{z}/{x}/{y}.png', 'https://c.tile.opentopomap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          attribution: '&copy; OpenStreetMap contributors, SRTM | OpenTopoMap (CC-BY-SA)'
+        }
+      },
+      layers: [{ id: 'basemap', type: 'raster', source: 'base' }]
+    };
+  }
+  if (baseMapId === 'geographic') {
+    return {
+      version: 8,
+      sources: {
+        base: {
+          type: 'raster',
+          tiles: [
+            'https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+            'https://b.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+            'https://c.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png'
+          ],
+          tileSize: 256,
+          attribution: '&copy; OpenStreetMap contributors | CyclOSM'
+        }
+      },
+      layers: [{ id: 'basemap', type: 'raster', source: 'base' }]
+    };
+  }
+  return {
+    version: 8,
+    sources: {
+      base: {
+        type: 'raster',
+        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        attribution: '&copy; OpenStreetMap contributors'
+      }
+    },
+    layers: [{ id: 'basemap', type: 'raster', source: 'base' }]
+  };
+}
+
 function initMap(): void {
   const mapCanvas = document.querySelector<HTMLDivElement>('#map-canvas');
   if (!mapCanvas) {
@@ -1829,18 +2050,7 @@ function initMap(): void {
 
   map = new maplibregl.Map({
     container: mapCanvas,
-    style: {
-      version: 8,
-      sources: {
-        osm: {
-          type: 'raster',
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          attribution: '&copy; OpenStreetMap contributors'
-        }
-      },
-      layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
-    },
+    style: buildBaseMapStyle(selectedBaseMapId),
     center: initialCenter,
     zoom: mapZoom,
     preserveDrawingBuffer: true
