@@ -625,3 +625,14 @@
 - Known Issues / Next Focus:
   - Very narrow windows still require horizontal scrolling for full results visibility.
 - Commit: this commit (`milestone(M46): optimize results header line wraps v0.47.0`)
+
+## M47 - Results Header Full-Word Label Restore
+- Date: 2026-03-07
+- Version: 0.48.0
+- Completed:
+  - Restored Results table header labels to full words (removed abbreviations introduced in prior compacting pass).
+  - Kept explicit multi-line header structuring and unit-in-header formatting.
+  - Preserved numeric-only values in result rows.
+- Known Issues / Next Focus:
+  - None specific to this milestone.
+- Commit: this commit (`milestone(M47): restore full-word results headers v0.48.0`)

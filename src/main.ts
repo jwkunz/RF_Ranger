@@ -679,23 +679,23 @@ function renderReportsTab(): string {
         <thead>
           <tr>
             <th>${h(['Run', 'Time'])}</th>
-            <th>${h(['TX Site', 'Name'])}</th>
-            <th>${h(['TX', 'Coordinates'])}</th>
-            <th>${h(['TX', 'Radio'])}</th>
+            <th>${h(['Transmitter', 'Site Name'])}</th>
+            <th>${h(['Transmitter', 'Coordinates'])}</th>
+            <th>${h(['Transmitter', 'Radio'])}</th>
             <th>${h(['Frequency'], 'MHz')}</th>
             <th>${h(['Bandwidth'], 'kHz')}</th>
-            <th>${h(['RX Site', 'Name'])}</th>
-            <th>${h(['RX', 'Coordinates'])}</th>
-            <th>${h(['RX', 'Radio'])}</th>
-            <th>${h(['TX EIRP'], powerUnit)}</th>
-            <th>${h(['TX EIRP', 'Density'], powerDensityUnit)}</th>
+            <th>${h(['Receiver', 'Site Name'])}</th>
+            <th>${h(['Receiver', 'Coordinates'])}</th>
+            <th>${h(['Receiver', 'Radio'])}</th>
+            <th>${h(['Transmitter', 'EIRP'], powerUnit)}</th>
+            <th>${h(['Transmitter EIRP', 'Density'], powerDensityUnit)}</th>
             <th>${h(['Distance'], distanceUnit)}</th>
-            <th>${h(['Path', 'Loss'], 'dB')}</th>
-            <th>${h(['Pwr Dens', 'at RX Ant'], powerDensityUnit)}</th>
-            <th>${h(['E-Field Dens', 'at RX Ant'], 'V/m')}</th>
-            <th>${h(['Pwr Dens', 'into RX'], powerDensityUnit)}</th>
-            <th>${h(['RX Noise', 'Floor'], powerDensityUnit)}</th>
-            <th>${h(['SNR', 'in RX'], 'dB')}</th>
+            <th>${h(['Propagation', 'Losses'], 'dB')}</th>
+            <th>${h(['Power Density at', 'Receive Antenna'], powerDensityUnit)}</th>
+            <th>${h(['Electric Field Density', 'at Receive Antenna'], 'V/m')}</th>
+            <th>${h(['Power Density', 'Into Receiver'], powerDensityUnit)}</th>
+            <th>${h(['Receiver', 'Noise Floor'], powerDensityUnit)}</th>
+            <th>${h(['SNR in', 'Receiver'], 'dB')}</th>
             <th>${h(['Usable', 'Link'])}</th>
             <th>${h(['Warnings'])}</th>
             <th>${h(['Jump'])}</th>
