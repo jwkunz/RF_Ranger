@@ -1069,7 +1069,7 @@ function renderAntennasTab(): string {
     })
     .join('');
   const previewSvg = renderAntennaPatternPolarSvg(effectivePreviewPattern, effectivePreviewParams, antennaPatternPreviewElevationDeg);
-  const previewDocHtml = renderModelGuideHtml(ANTENNA_PATTERN_DOCS[effectivePreviewPattern]);
+  const patternReferenceHtml = renderModelGuideHtml(ANTENNA_PATTERN_DOCS[antennaPatternPreviewType]);
   const rows = workspace.antennas
     .map(
       (antenna) => `
@@ -1118,8 +1118,8 @@ function renderAntennasTab(): string {
         </form>
       </div>
       <aside class="propagation-guide">
-        <h3>Pattern Equations</h3>
-        <div class="manual__body">${previewDocHtml}</div>
+        <h3>Pattern Equation Reference</h3>
+        <div class="manual__body">${patternReferenceHtml}</div>
       </aside>
       <aside class="antenna-visualization">
         <h3>Pattern Visualization</h3>
@@ -1143,10 +1143,6 @@ function renderAntennasTab(): string {
         <thead><tr><th>Name</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Pattern Parameters</th><th>Gain</th><th>Comments</th><th>Actions</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="10">No antennas yet.</td></tr>'}</tbody>
       </table>
-    </section>
-    <section class="panel">
-      <h3>Pattern Equation Reference</h3>
-      <div class="manual__body">${previewDocHtml}</div>
     </section>
   `;
 }

@@ -724,3 +724,15 @@
 - Known Issues / Next Focus:
   - Bottom-equation-only view can be revisited if you want equations shown in just one place instead of both mid-column and reference section.
 - Commit: this commit (`milestone(M52): antenna tab three-column parameterized model refactor v0.53.0`)
+
+## M53 - Antenna Equation Panel Placement + Binding Adjustment
+- Date: 2026-03-07
+- Version: 0.54.0
+- Completed:
+  - Moved `Pattern Equation Reference` into the middle column of the Antennas 3-column layout.
+  - Replaced the middle-column heading `Pattern Equations` with `Pattern Equation Reference`.
+  - Removed duplicate bottom `Pattern Equation Reference` panel.
+  - Bound middle-column equation content to the Add Antenna `Pattern` dropdown selection.
+- Known Issues / Next Focus:
+  - None specific to this milestone.
+- Commit: this commit (`milestone(M53): antenna equation panel placement and binding v0.54.0`)
