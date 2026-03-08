@@ -1093,15 +1093,18 @@ function renderAntennasTab(): string {
       return `<label>${label}<input data-antenna-param="${key}" type="number" step="0.0001" value="${defaultValue}" />${description}</label>`;
     })
     .join('');
-  const markerGainDb = antennaPatternRelativeGainDb(
+  const previewPeakGainDbi = previewAntenna?.gainOverrideDb ?? defaultPeakGainDbiForPattern(effectivePreviewPattern);
+  const markerGainDb = antennaPatternGainDb(
     effectivePreviewPattern,
     effectivePreviewParams,
+    previewPeakGainDbi,
     antennaPatternCutMode === 'azimuth' ? clampedMarkerAngle : clampedFixedAngle,
     antennaPatternCutMode === 'azimuth' ? clampedFixedAngle : clampedMarkerAngle
   );
   const previewSvg = renderAntennaPatternPolarSvg(
     effectivePreviewPattern,
     effectivePreviewParams,
+    previewPeakGainDbi,
     antennaPatternCutMode,
     clampedFixedAngle,
     clampedMarkerAngle
@@ -1175,7 +1178,7 @@ function renderAntennasTab(): string {
           </label>
         </div>
         <p id="antenna-pattern-error" class="field-error"></p>
-        <p class="muted">Marker Readout: <strong id="antenna-pattern-marker-readout">${clampedMarkerAngle.toFixed(1)}°, ${markerGainDb.toFixed(2)} dBr</strong> (drag marker on plot)</p>
+        <p class="muted">Marker Readout: <strong id="antenna-pattern-marker-readout">${clampedMarkerAngle.toFixed(1)}°, ${markerGainDb.toFixed(2)} dBi</strong> (drag marker on plot)</p>
         <div class="antenna-visualization__plot">${previewSvg}</div>
       </aside>
     </section>
@@ -2540,23 +2543,38 @@ function wireAntennaEvents(): void {
     const errorEl = document.querySelector<HTMLElement>('#antenna-pattern-error');
     let pattern: AntennaPattern;
     let parameters: Record<string, number>;
+    let peakGainDbi: number;
     let errorMessage = '';
 
     if (selected) {
       pattern = selected.pattern;
       parameters = selected.patternParameters ?? antennaPatternParameterDefaults[pattern];
+      peakGainDbi = selected.gainOverrideDb ?? defaultPeakGainDbiForPattern(pattern);
     } else {
       const form = document.querySelector<HTMLFormElement>('#add-antenna-form');
       const patternFromForm = form?.querySelector<HTMLSelectElement>('#antenna-pattern-form')?.value as AntennaPattern | undefined;
       pattern = patternFromForm ?? antennaPatternPreviewType;
       const defaults = antennaPatternParameterDefaults[pattern];
       parameters = { ...defaults };
+      const peakInput = form?.querySelector<HTMLInputElement>('input[name="gainOverrideDb"]');
+      const rawPeak = peakInput?.value?.trim() ?? '';
+      const parsedPeak = Number.parseFloat(rawPeak);
+      if (!rawPeak) {
+        peakGainDbi = defaultPeakGainDbiForPattern(pattern);
+      } else if (!Number.isFinite(parsedPeak)) {
+        peakGainDbi = defaultPeakGainDbiForPattern(pattern);
+        errorMessage = 'Enter a valid numeric Peak Gain (dBi).';
+      } else {
+        peakGainDbi = parsedPeak;
+      }
       for (const key of Object.keys(defaults)) {
         const input = form?.querySelector<HTMLInputElement>(`[data-antenna-param="${key}"]`);
         const rawValue = input?.value?.trim() ?? '';
         const parsed = Number.parseFloat(rawValue);
         if (!rawValue || !Number.isFinite(parsed)) {
-          errorMessage = `Enter valid numeric values for ${prettyLabel(key)} to preview this pattern.`;
+          if (!errorMessage) {
+            errorMessage = `Enter valid numeric values for ${prettyLabel(key)} to preview this pattern.`;
+          }
         } else {
           parameters[key] = parsed;
         }
@@ -2584,16 +2602,24 @@ function wireAntennaEvents(): void {
     if (markerValueEl) {
       markerValueEl.textContent = antennaPatternMarkerAngleDeg.toFixed(1);
     }
-    plot.innerHTML = renderAntennaPatternPolarSvg(pattern, parameters, antennaPatternCutMode, antennaPatternFixedAngleDeg, antennaPatternMarkerAngleDeg);
-    const gainDb = antennaPatternRelativeGainDb(
+    plot.innerHTML = renderAntennaPatternPolarSvg(
       pattern,
       parameters,
+      peakGainDbi,
+      antennaPatternCutMode,
+      antennaPatternFixedAngleDeg,
+      antennaPatternMarkerAngleDeg
+    );
+    const gainDb = antennaPatternGainDb(
+      pattern,
+      parameters,
+      peakGainDbi,
       antennaPatternCutMode === 'azimuth' ? antennaPatternMarkerAngleDeg : antennaPatternFixedAngleDeg,
       antennaPatternCutMode === 'azimuth' ? antennaPatternFixedAngleDeg : antennaPatternMarkerAngleDeg
     );
     const readout = document.querySelector<HTMLElement>('#antenna-pattern-marker-readout');
     if (readout) {
-      readout.textContent = `${antennaPatternMarkerAngleDeg.toFixed(1)}°, ${gainDb.toFixed(2)} dBr`;
+      readout.textContent = `${antennaPatternMarkerAngleDeg.toFixed(1)}°, ${gainDb.toFixed(2)} dBi`;
     }
   };
 
@@ -3173,6 +3199,7 @@ function downloadDataUrl(dataUrl: string, fileName: string): void {
 function renderAntennaPatternPolarSvg(
   pattern: AntennaPattern,
   patternParameters: Record<string, number>,
+  peakGainDbi: number,
   cutMode: 'azimuth' | 'elevation',
   fixedAngleDeg: number,
   markerAngleDeg: number
@@ -3182,13 +3209,13 @@ function renderAntennaPatternPolarSvg(
   const centerX = width / 2;
   const centerY = height / 2;
   const radius = 145;
-  const minDb = -40;
+  const minDb = peakGainDbi - 40;
   const variableAngles = cutMode === 'azimuth' ? Array.from({ length: 361 }, (_, index) => index - 180) : Array.from({ length: 181 }, (_, index) => index - 90);
   const points = variableAngles.map((angleDeg) => {
     const azOffset = cutMode === 'azimuth' ? angleDeg : fixedAngleDeg;
     const elOffset = cutMode === 'azimuth' ? fixedAngleDeg : angleDeg;
-    const gainDb = antennaPatternRelativeGainDb(pattern, patternParameters, azOffset, elOffset);
-    const normalized = Math.max(0, Math.min(1, (gainDb - minDb) / (0 - minDb)));
+    const gainDb = antennaPatternGainDb(pattern, patternParameters, peakGainDbi, azOffset, elOffset);
+    const normalized = Math.max(0, Math.min(1, (gainDb - minDb) / (peakGainDbi - minDb)));
     const r = normalized * radius;
     const theta = ((angleDeg - 90) * Math.PI) / 180;
     return `${(centerX + r * Math.cos(theta)).toFixed(2)},${(centerY + r * Math.sin(theta)).toFixed(2)}`;
@@ -3197,8 +3224,8 @@ function renderAntennaPatternPolarSvg(
   const subtitle = cutMode === 'azimuth' ? `Azimuth Cut at Elevation ${fixedAngleDeg.toFixed(1)}°` : `Elevation Cut at Azimuth ${fixedAngleDeg.toFixed(1)}°`;
   const markerAz = cutMode === 'azimuth' ? markerAngleDeg : fixedAngleDeg;
   const markerEl = cutMode === 'azimuth' ? fixedAngleDeg : markerAngleDeg;
-  const markerGainDb = antennaPatternRelativeGainDb(pattern, patternParameters, markerAz, markerEl);
-  const markerNormalized = Math.max(0, Math.min(1, (markerGainDb - minDb) / (0 - minDb)));
+  const markerGainDb = antennaPatternGainDb(pattern, patternParameters, peakGainDbi, markerAz, markerEl);
+  const markerNormalized = Math.max(0, Math.min(1, (markerGainDb - minDb) / (peakGainDbi - minDb)));
   const markerR = markerNormalized * radius;
   const markerTheta = ((markerAngleDeg - 90) * Math.PI) / 180;
   const markerX = centerX + markerR * Math.cos(markerTheta);
@@ -3206,9 +3233,9 @@ function renderAntennaPatternPolarSvg(
 
   const rings = [0.25, 0.5, 0.75, 1].map((scale) => {
     const r = radius * scale;
-    const dbLabel = (minDb * (1 - scale)).toFixed(0);
+    const dbLabel = (minDb + (peakGainDbi - minDb) * scale).toFixed(1);
     return `<circle cx="${centerX}" cy="${centerY}" r="${r}" class="antenna-polar__ring" />
-      <text x="${centerX + 4}" y="${centerY - r + 12}" class="antenna-polar__ring-label">${dbLabel} dBr</text>`;
+      <text x="${centerX + 4}" y="${centerY - r + 12}" class="antenna-polar__ring-label">${dbLabel} dBi</text>`;
   });
 
   return `
@@ -3227,14 +3254,15 @@ function renderAntennaPatternPolarSvg(
   `;
 }
 
-function antennaPatternRelativeGainDb(
+function antennaPatternGainDb(
   pattern: AntennaPattern,
   patternParameters: Record<string, number>,
+  peakGainDbi: number,
   azimuthOffsetDeg: number,
   elevationOffsetDeg: number
 ): number {
   const attenuationDb = antennaPatternAttenuationDb(pattern, patternParameters, azimuthOffsetDeg, elevationOffsetDeg);
-  return -attenuationDb;
+  return peakGainDbi - attenuationDb;
 }
 
 function antennaPatternAttenuationDb(

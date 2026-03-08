@@ -810,3 +810,17 @@
 - Known Issues / Next Focus:
   - Optional refinement: expose rectangular horn efficiency factor in UI for direct aperture-gain tuning.
 - Commit: this commit (`milestone(M58): peak gain semantics and rectangular horn parameters v0.59.0`)
+
+## M59 - Absolute Gain Pattern Visualization
+- Date: 2026-03-07
+- Version: 0.60.0
+- Completed:
+  - Updated pattern visualization plot from relative gain (`dBr`) to absolute gain (`dBi`).
+  - Updated marker readout to report absolute gain in `dBi`.
+  - Updated ring labels to display absolute gain values in `dBi`.
+  - Wired absolute-gain computation to use antenna peak gain from:
+    - selected known antenna, or
+    - Add Antenna draft `Peak Gain (dBi)` in live preview mode.
+- Known Issues / Next Focus:
+  - Optional: add a user setting for visualization floor span (currently fixed at peak - 40 dB).
+- Commit: this commit (`milestone(M59): plot absolute gain in pattern visualization v0.60.0`)
