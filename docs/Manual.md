@@ -1,7 +1,7 @@
 # RF Ranger Manual
 
 ## 1. Startup
-On launch, RF Ranger displays a splash screen with project branding and legal notice.
+On launch, RF Ranger displays a splash screen with project branding.
 
 ## 2. Tab Overview
 - **Sites**: Define named geographic sites (coordinates/address) and pin color.
@@ -13,6 +13,7 @@ On launch, RF Ranger displays a splash screen with project branding and legal no
 - **Results**: View buffered simulation results as a multi-run table, select visible runs via queue checkboxes, and export visible rows to CSV.
 - **Report**: Generate a downloadable PDF report from selected result run content using an include-tree of categories/fields.
 - **Preferences**: Change theme and units.
+- **Preferences**: Change theme and units, manage license status, and install/remove license files.
 - **Help**: Read this manual.
 - **Legal**: Review licenses, dependencies, and remote-communication disclosures.
 
@@ -34,6 +35,19 @@ On launch, RF Ranger displays a splash screen with project branding and legal no
 - Import JSON to restore workspace.
 - Export/import sites with KML.
 
-## 5. Warnings and Validation
+## 5. Licensing
+- RF Ranger runs in `Read-Only Mode` unless a valid license is installed.
+- To request a license, email `numerius.engineering@gmail.com` and include your machine fingerprint from:
+  - `Preferences` -> `License Management` -> `Machine Fingerprint`
+- To install a license:
+  1. Open `Preferences`.
+  2. In `License Management`, choose `Install License`.
+  3. Select the provided `.json`/`.license.json` file.
+  4. Confirm status changes to `Valid`.
+- In read-only mode:
+  - Viewing tabs and exporting existing data is allowed.
+  - Add/edit/delete/import/simulation actions are blocked.
+
+## 6. Warnings and Validation
 - Frequency mismatch is allowed but shown as warning.
 - Useable link depends on required SNR threshold checks.

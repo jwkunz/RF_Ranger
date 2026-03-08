@@ -14,6 +14,24 @@ export type TabId =
 export type PowerUnit = 'dBm' | 'dBW';
 export type DistanceUnit = 'km' | 'm' | 'miles' | 'feet';
 export type ThemeMode = 'light' | 'dark';
+export type LicenseValidationStatus = 'valid' | 'missing' | 'invalid_signature' | 'payload_invalid' | 'machine_mismatch' | 'tampered';
+
+export interface LicensePayload {
+  license_id: string;
+  licensed_user: string;
+  licensed_org: string;
+  machine_fingerprint: string;
+  features: string[];
+  issued_at: string;
+  issuer: string;
+}
+
+export interface LicenseEnvelope {
+  alg: 'Ed25519';
+  key_id: string;
+  payload: LicensePayload;
+  signature: string;
+}
 
 export type AntennaPattern =
   | 'Omnidirectional'
@@ -166,4 +184,5 @@ export interface WorkspaceSnapshot {
   reportLatest: SimulationResultRow[];
   reportHistory: ResultRun[];
   savedSiteViews: SavedSiteView[];
+  license?: LicenseEnvelope;
 }

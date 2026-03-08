@@ -515,6 +515,36 @@ fieldset.param-grid {
   font-size: 0.9rem;
 }
 
+.license-banner {
+  margin: 0.8rem 1.2rem 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.16);
+  font-weight: 600;
+}
+
+.license-status {
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.license-status--valid {
+  border: 1px solid #22c55e;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.license-status--invalid {
+  border: 1px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.readonly-locked {
+  opacity: 0.6;
+}
+
 .simulation-section {
   display: grid;
   gap: 0.8rem;
