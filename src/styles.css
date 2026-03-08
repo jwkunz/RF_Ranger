@@ -502,6 +502,7 @@ fieldset.param-grid {
 }
 
 .sim-columns--queue {
+  grid-template-columns: repeat(9, minmax(105px, 1fr));
   border-top: 1px solid #94a3b8;
   padding-top: 0.5rem;
 }

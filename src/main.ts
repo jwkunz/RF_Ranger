@@ -536,7 +536,8 @@ function renderSimulationTab(): string {
         <div>${escapeHtml(rxSiteName)}</div>
         <div>${escapeHtml(receiverName)}</div>
         <div>${escapeHtml(rxAntennaName)}</div>
-        <div>${escapeHtml(item.comments || '')} <button data-remove-queue="${item.id}">Remove</button></div>
+        <div>${escapeHtml(item.comments || '')}</div>
+        <div><button data-remove-queue="${item.id}">Remove</button></div>
       </div>`;
     })
     .join('');
@@ -583,6 +584,7 @@ function renderSimulationTab(): string {
         <div>Receiver Radio</div>
         <div>RX Antenna</div>
         <div>Comments</div>
+        <div>Actions</div>
       </div>
       ${queueRows || '<p class="muted">Queue is empty.</p>'}
       <div class="action-row">

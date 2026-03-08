@@ -579,3 +579,14 @@
 - Known Issues / Next Focus:
   - None specific to this milestone.
 - Commit: this commit (`milestone(M42): antenna form labels v0.43.0`)
+
+## M43 - Simulation Queue Actions Column Fix
+- Date: 2026-03-07
+- Version: 0.44.0
+- Completed:
+  - Fixed Simulation Queue panel layout so `Comments` no longer shares a cell with the `Remove` button.
+  - Added a dedicated `Actions` header/column in the queue section.
+  - Updated queue grid column sizing to support separate comments and actions columns.
+- Known Issues / Next Focus:
+  - None specific to this milestone.
+- Commit: this commit (`milestone(M43): simulation queue actions column fix v0.44.0`)
