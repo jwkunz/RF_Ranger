@@ -515,12 +515,22 @@ fieldset.param-grid {
 }
 
 .sim-columns--queue-grid {
-  grid-template-columns: repeat(9, minmax(105px, 1fr));
+  grid-template-columns: repeat(8, minmax(120px, 1fr));
 }
 
 .sim-columns--queue {
   border-top: 1px solid #94a3b8;
   padding-top: 0.5rem;
+}
+
+.sim-queue-row {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.sim-queue-row__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .sim-columns label {

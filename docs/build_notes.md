@@ -636,3 +636,14 @@
 - Known Issues / Next Focus:
   - None specific to this milestone.
 - Commit: this commit (`milestone(M47): restore full-word results headers v0.48.0`)
+
+## M48 - Simulation Queue Column Alignment Simplification
+- Date: 2026-03-07
+- Version: 0.49.0
+- Completed:
+  - Removed the separate `Actions` column from the Simulation Queue structured grid.
+  - Aligned queue headers and queue row entries on a consistent 8-column grid.
+  - Moved each `Remove` button outside the structured queue columns into a dedicated action row below each entry.
+- Known Issues / Next Focus:
+  - None specific to this milestone.
+- Commit: this commit (`milestone(M48): simplify simulation queue alignment and actions v0.49.0`)

@@ -528,16 +528,18 @@ function renderSimulationTab(): string {
       const receiverName = workspace.sinks.find((sink) => sink.id === item.receiverRadioId)?.name ?? '[missing receiver]';
       const rxAntennaName = workspace.antennas.find((antenna) => antenna.id === item.rxAntennaId)?.name ?? '[missing rx antenna]';
       return `
-      <div class="sim-columns sim-columns--queue-grid sim-columns--queue">
-        <div>${escapeHtml(txSiteName)}</div>
-        <div>${escapeHtml(sourceName)}</div>
-        <div>${escapeHtml(txAntennaName)}</div>
-        <div>${escapeHtml(modelName)}</div>
-        <div>${escapeHtml(rxSiteName)}</div>
-        <div>${escapeHtml(receiverName)}</div>
-        <div>${escapeHtml(rxAntennaName)}</div>
-        <div>${escapeHtml(item.comments || '')}</div>
-        <div><button data-remove-queue="${item.id}">Remove</button></div>
+      <div class="sim-queue-row">
+        <div class="sim-columns sim-columns--queue-grid sim-columns--queue">
+          <div>${escapeHtml(txSiteName)}</div>
+          <div>${escapeHtml(sourceName)}</div>
+          <div>${escapeHtml(txAntennaName)}</div>
+          <div>${escapeHtml(modelName)}</div>
+          <div>${escapeHtml(rxSiteName)}</div>
+          <div>${escapeHtml(receiverName)}</div>
+          <div>${escapeHtml(rxAntennaName)}</div>
+          <div>${escapeHtml(item.comments || '')}</div>
+        </div>
+        <div class="sim-queue-row__actions"><button data-remove-queue="${item.id}">Remove</button></div>
       </div>`;
     })
     .join('');
@@ -575,7 +577,7 @@ function renderSimulationTab(): string {
 
     <section class="panel simulation-section">
       <h3>Simulation Queue</h3>
-      <div class="sim-columns sim-columns--header">
+      <div class="sim-columns sim-columns--header sim-columns--queue-grid">
         <div>Transmitter Site</div>
         <div>Source Radio</div>
         <div>TX Antenna</div>
@@ -584,7 +586,6 @@ function renderSimulationTab(): string {
         <div>Receiver Radio</div>
         <div>RX Antenna</div>
         <div>Comments</div>
-        <div>Actions</div>
       </div>
       ${queueRows || '<p class="muted">Queue is empty.</p>'}
       <div class="action-row">
