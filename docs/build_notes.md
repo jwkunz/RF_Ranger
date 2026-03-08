@@ -590,3 +590,15 @@
 - Known Issues / Next Focus:
   - None specific to this milestone.
 - Commit: this commit (`milestone(M43): simulation queue actions column fix v0.44.0`)
+
+## M44 - Results Table Header Compaction + Unit Placement
+- Date: 2026-03-07
+- Version: 0.45.0
+- Completed:
+  - Updated Results table headers to use wrapped labels with a 3-line capped layout for narrower column footprint.
+  - Moved units from row cell values into column headers in parenthesis.
+  - Updated displayed row values to numeric-only formatting for power, power density, distance, propagation loss, electric field density, and SNR.
+  - Kept unit conversions consistent with user preferences (power and distance) while removing unit suffixes from values.
+- Known Issues / Next Focus:
+  - Dense tables can still require horizontal scrolling on smaller screens.
+- Commit: this commit (`milestone(M44): compact results headers and numeric-only values v0.45.0`)

@@ -600,6 +600,18 @@ function renderSimulationTab(): string {
 }
 
 function renderReportsTab(): string {
+  const powerUnit = workspace.preferences.powerUnit === 'dBW' ? 'dBW' : 'dBm';
+  const powerDensityUnit = `${powerUnit}/Hz`;
+  const distanceUnit =
+    workspace.preferences.distanceUnit === 'm'
+      ? 'm'
+      : workspace.preferences.distanceUnit === 'miles'
+        ? 'miles'
+        : workspace.preferences.distanceUnit === 'feet'
+          ? 'ft'
+          : 'km';
+  const h = (label: string, unit?: string): string => `<span class="results-th-wrap">${escapeHtml(unit ? `${label} (${unit})` : label)}</span>`;
+
   const visibleRuns = getVisibleResultRuns();
   const visibleRows = visibleRuns.flatMap((run) =>
     run.rows.map((row) => ({
@@ -621,15 +633,15 @@ function renderReportsTab(): string {
         <td>${escapeHtml(row.receiverSiteName)}</td>
         <td>${escapeHtml(row.receiverCoordinates)}</td>
         <td>${escapeHtml(row.receiverRadio)}</td>
-        <td>${formatPower(row.transmitterEirpDbm)}</td>
-        <td>${formatPowerDensity(row.transmitterEirpDensityDbmPerHz)}</td>
-        <td>${formatDistance(row.distanceKm)}</td>
-        <td>${row.propagationLossesDb.toFixed(2)} dB</td>
-        <td>${formatPowerDensity(row.incidentRfPowerDensityDbmPerHz)}</td>
-        <td>${row.incidentElectricFieldVm.toExponential(3)} V/m</td>
-        <td>${formatPowerDensity(row.availablePowerDensityAtAntennaDbmPerHz)}</td>
-        <td>${formatPowerDensity(row.receiverNoiseFloorDensityDbmPerHz)}</td>
-        <td>${row.snrDb.toFixed(2)} dB</td>
+        <td>${formatPowerNumeric(row.transmitterEirpDbm)}</td>
+        <td>${formatPowerDensityNumeric(row.transmitterEirpDensityDbmPerHz)}</td>
+        <td>${formatDistanceNumeric(row.distanceKm)}</td>
+        <td>${row.propagationLossesDb.toFixed(2)}</td>
+        <td>${formatPowerDensityNumeric(row.incidentRfPowerDensityDbmPerHz)}</td>
+        <td>${row.incidentElectricFieldVm.toExponential(3)}</td>
+        <td>${formatPowerDensityNumeric(row.availablePowerDensityAtAntennaDbmPerHz)}</td>
+        <td>${formatPowerDensityNumeric(row.receiverNoiseFloorDensityDbmPerHz)}</td>
+        <td>${row.snrDb.toFixed(2)}</td>
         <td>${row.usableLink}</td>
         <td>${escapeHtml(row.warnings.join('; '))}</td>
         <td><button data-jump-site="${row.rxSiteId}">Site</button></td>
@@ -660,30 +672,30 @@ function renderReportsTab(): string {
       <div class="action-row">
         <button id="export-csv">Export CSV</button>
       </div>
-      <table>
+      <table class="results-table">
         <thead>
           <tr>
-            <th>Run Time</th>
-            <th>Transmitter Site Name</th>
-            <th>Transmitter Coordinates</th>
-            <th>Transmitter Radio</th>
-            <th>Frequency (MHz)</th>
-            <th>Bandwidth (kHz)</th>
-            <th>Receiver Site Name</th>
-            <th>Receiver Coordinates</th>
-            <th>Receiver Radio</th>
-            <th>Transmitter EIRP</th>
-            <th>Transmitter EIRP Density</th>
-            <th>Distance</th>
-            <th>Propagation Losses</th>
-            <th>Power Density at Receive Antenna</th>
-            <th>Electric Field Density at Receive Antenna</th>
-            <th>Power Density Into Receiver</th>
-            <th>Receiver Noise Floor</th>
-            <th>SNR in Receiver</th>
-            <th>Useable Link</th>
-            <th>Warnings</th>
-            <th>Jump</th>
+            <th>${h('Run Time')}</th>
+            <th>${h('Transmitter Site Name')}</th>
+            <th>${h('Transmitter Coordinates')}</th>
+            <th>${h('Transmitter Radio')}</th>
+            <th>${h('Frequency', 'MHz')}</th>
+            <th>${h('Bandwidth', 'kHz')}</th>
+            <th>${h('Receiver Site Name')}</th>
+            <th>${h('Receiver Coordinates')}</th>
+            <th>${h('Receiver Radio')}</th>
+            <th>${h('Transmitter EIRP', powerUnit)}</th>
+            <th>${h('Transmitter EIRP Density', powerDensityUnit)}</th>
+            <th>${h('Distance', distanceUnit)}</th>
+            <th>${h('Propagation Losses', 'dB')}</th>
+            <th>${h('Power Density at Receive Antenna', powerDensityUnit)}</th>
+            <th>${h('Electric Field Density at Receive Antenna', 'V/m')}</th>
+            <th>${h('Power Density Into Receiver', powerDensityUnit)}</th>
+            <th>${h('Receiver Noise Floor', powerDensityUnit)}</th>
+            <th>${h('SNR in Receiver', 'dB')}</th>
+            <th>${h('Useable Link')}</th>
+            <th>${h('Warnings')}</th>
+            <th>${h('Jump')}</th>
           </tr>
         </thead>
         <tbody>${rows || '<tr><td colspan="21">No visible result data. Check runs in the queue below.</td></tr>'}</tbody>
@@ -2648,11 +2660,25 @@ function formatPower(dbm: number): string {
   return `${dbm.toFixed(2)} dBm`;
 }
 
+function formatPowerNumeric(dbm: number): string {
+  if (workspace.preferences.powerUnit === 'dBW') {
+    return (dbm - 30).toFixed(2);
+  }
+  return dbm.toFixed(2);
+}
+
 function formatPowerDensity(dbmPerHz: number): string {
   if (workspace.preferences.powerUnit === 'dBW') {
     return `${(dbmPerHz - 30).toFixed(2)} dBW/Hz`;
   }
   return `${dbmPerHz.toFixed(2)} dBm/Hz`;
+}
+
+function formatPowerDensityNumeric(dbmPerHz: number): string {
+  if (workspace.preferences.powerUnit === 'dBW') {
+    return (dbmPerHz - 30).toFixed(2);
+  }
+  return dbmPerHz.toFixed(2);
 }
 
 function formatDistance(km: number): string {
@@ -2666,6 +2692,20 @@ function formatDistance(km: number): string {
     case 'km':
     default:
       return `${km.toFixed(3)} km`;
+  }
+}
+
+function formatDistanceNumeric(km: number): string {
+  switch (workspace.preferences.distanceUnit) {
+    case 'm':
+      return (km * 1000).toFixed(2);
+    case 'miles':
+      return (km * 0.621371).toFixed(3);
+    case 'feet':
+      return (km * 3280.84).toFixed(2);
+    case 'km':
+    default:
+      return km.toFixed(3);
   }
 }
 
