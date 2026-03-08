@@ -463,7 +463,8 @@ let showPendingXMarker = true;
 let saveSiteViewAsPng = false;
 let selectedBaseMapId: BaseMapId = 'street';
 let antennaPatternPreviewType: AntennaPattern = 'Omnidirectional';
-let antennaPatternPreviewElevationDeg = 0;
+let antennaPatternCutMode: 'azimuth' | 'elevation' = 'azimuth';
+let antennaPatternFixedAngleDeg = 0;
 let selectedAntennaPreviewId = '';
 let selectedReportTreeIds = new Set<string>(
   REPORT_TREE.flatMap((category) => [category.id, ...category.fields.map((field) => field.id)])
@@ -1049,9 +1050,22 @@ function renderRadiosTab(): string {
 
 function renderAntennasTab(): string {
   const patternOptions: AntennaPattern[] = ['Omnidirectional', 'Vertical Dipole', 'Vertical Monopole', 'Horizontal Dipole', 'Horn'];
-  const previewAntenna = workspace.antennas.find((antenna) => antenna.id === selectedAntennaPreviewId) ?? workspace.antennas[0] ?? null;
+  const previewAntenna = selectedAntennaPreviewId
+    ? (workspace.antennas.find((antenna) => antenna.id === selectedAntennaPreviewId) ?? null)
+    : null;
   const effectivePreviewPattern = previewAntenna?.pattern ?? antennaPatternPreviewType;
   const effectivePreviewParams = previewAntenna?.patternParameters ?? antennaPatternParameterDefaults[effectivePreviewPattern];
+  const cutModeOptions = [
+    { value: 'azimuth', label: 'Azimuth Cut' },
+    { value: 'elevation', label: 'Elevation Cut' }
+  ] as const;
+  const cutModeSelectOptions = cutModeOptions
+    .map((option) => `<option value="${option.value}" ${option.value === antennaPatternCutMode ? 'selected' : ''}>${option.label}</option>`)
+    .join('');
+  const fixedAngleLabel = antennaPatternCutMode === 'azimuth' ? 'Fixed Elevation (deg)' : 'Fixed Azimuth (deg)';
+  const fixedAngleMin = antennaPatternCutMode === 'azimuth' ? -90 : -180;
+  const fixedAngleMax = antennaPatternCutMode === 'azimuth' ? 90 : 180;
+  const clampedFixedAngle = Math.max(fixedAngleMin, Math.min(fixedAngleMax, antennaPatternFixedAngleDeg));
   const previewPatternOptions = patternOptions
     .map((pattern) => `<option value="${pattern}" ${pattern === antennaPatternPreviewType ? 'selected' : ''}>${pattern}</option>`)
     .join('');
@@ -1068,7 +1082,7 @@ function renderAntennasTab(): string {
       return `<label>${label}<input data-antenna-param="${key}" type="number" step="0.0001" value="${defaultValue}" />${description}</label>`;
     })
     .join('');
-  const previewSvg = renderAntennaPatternPolarSvg(effectivePreviewPattern, effectivePreviewParams, antennaPatternPreviewElevationDeg);
+  const previewSvg = renderAntennaPatternPolarSvg(effectivePreviewPattern, effectivePreviewParams, antennaPatternCutMode, clampedFixedAngle);
   const patternReferenceHtml = renderModelGuideHtml(ANTENNA_PATTERN_DOCS[antennaPatternPreviewType]);
   const rows = workspace.antennas
     .map(
@@ -1125,13 +1139,13 @@ function renderAntennasTab(): string {
         <h3>Pattern Visualization</h3>
         <div class="antenna-visualization__controls">
           <label>Known Antenna
-            <select id="antenna-preview-id">${previewAntennaOptions || '<option value="">No known antennas</option>'}</select>
+            <select id="antenna-preview-id"><option value="">Use Add Antenna Pattern</option>${previewAntennaOptions}</select>
           </label>
-          <label>Pattern Type
-            <select id="antenna-pattern-preview-select">${previewPatternOptions}</select>
+          <label>Cut Mode
+            <select id="antenna-pattern-cut-mode">${cutModeSelectOptions}</select>
           </label>
-          <label>Elevation Cut (deg): <strong id="antenna-pattern-elevation-value">${antennaPatternPreviewElevationDeg.toFixed(1)}</strong>
-            <input id="antenna-pattern-elevation" type="range" min="-90" max="90" step="1" value="${antennaPatternPreviewElevationDeg}" />
+          <label>${fixedAngleLabel}: <strong id="antenna-pattern-fixed-angle-value">${clampedFixedAngle.toFixed(1)}</strong>
+            <input id="antenna-pattern-fixed-angle" type="range" min="${fixedAngleMin}" max="${fixedAngleMax}" step="1" value="${clampedFixedAngle}" />
           </label>
         </div>
         <div class="antenna-visualization__plot">${previewSvg}</div>
@@ -2490,33 +2504,33 @@ function wireAntennaEvents(): void {
   const previewByKnownAntenna = document.querySelector<HTMLSelectElement>('#antenna-preview-id');
   previewByKnownAntenna?.addEventListener('change', () => {
     selectedAntennaPreviewId = previewByKnownAntenna.value;
-    const selected = workspace.antennas.find((antenna) => antenna.id === selectedAntennaPreviewId);
-    if (selected) {
-      antennaPatternPreviewType = selected.pattern;
+    render();
+  });
+
+  const previewCutMode = document.querySelector<HTMLSelectElement>('#antenna-pattern-cut-mode');
+  previewCutMode?.addEventListener('change', () => {
+    antennaPatternCutMode = (previewCutMode.value as 'azimuth' | 'elevation') ?? 'azimuth';
+    if (antennaPatternCutMode === 'azimuth') {
+      antennaPatternFixedAngleDeg = Math.max(-90, Math.min(90, antennaPatternFixedAngleDeg));
+    } else {
+      antennaPatternFixedAngleDeg = Math.max(-180, Math.min(180, antennaPatternFixedAngleDeg));
     }
     render();
   });
 
-  const previewPatternSelect = document.querySelector<HTMLSelectElement>('#antenna-pattern-preview-select');
-  previewPatternSelect?.addEventListener('change', () => {
-    antennaPatternPreviewType = previewPatternSelect.value as AntennaPattern;
-    selectedAntennaPreviewId = '';
-    render();
-  });
-
-  const previewElevation = document.querySelector<HTMLInputElement>('#antenna-pattern-elevation');
-  previewElevation?.addEventListener('input', () => {
-    antennaPatternPreviewElevationDeg = Number.parseFloat(previewElevation.value);
-    const valueEl = document.querySelector<HTMLElement>('#antenna-pattern-elevation-value');
+  const previewFixedAngle = document.querySelector<HTMLInputElement>('#antenna-pattern-fixed-angle');
+  previewFixedAngle?.addEventListener('input', () => {
+    antennaPatternFixedAngleDeg = Number.parseFloat(previewFixedAngle.value);
+    const valueEl = document.querySelector<HTMLElement>('#antenna-pattern-fixed-angle-value');
     if (valueEl) {
-      valueEl.textContent = antennaPatternPreviewElevationDeg.toFixed(1);
+      valueEl.textContent = antennaPatternFixedAngleDeg.toFixed(1);
     }
     const plot = document.querySelector<HTMLDivElement>('.antenna-visualization__plot');
     if (plot) {
       const selected = workspace.antennas.find((antenna) => antenna.id === selectedAntennaPreviewId);
       const pattern = selected?.pattern ?? antennaPatternPreviewType;
       const parameters = selected?.patternParameters ?? antennaPatternParameterDefaults[pattern];
-      plot.innerHTML = renderAntennaPatternPolarSvg(pattern, parameters, antennaPatternPreviewElevationDeg);
+      plot.innerHTML = renderAntennaPatternPolarSvg(pattern, parameters, antennaPatternCutMode, antennaPatternFixedAngleDeg);
     }
   });
 
@@ -3006,22 +3020,30 @@ function downloadDataUrl(dataUrl: string, fileName: string): void {
   anchor.click();
 }
 
-function renderAntennaPatternPolarSvg(pattern: AntennaPattern, patternParameters: Record<string, number>, elevationDeg: number): string {
+function renderAntennaPatternPolarSvg(
+  pattern: AntennaPattern,
+  patternParameters: Record<string, number>,
+  cutMode: 'azimuth' | 'elevation',
+  fixedAngleDeg: number
+): string {
   const width = 360;
   const height = 360;
   const centerX = width / 2;
   const centerY = height / 2;
   const radius = 145;
   const minDb = -40;
-  const azimuthDegs = Array.from({ length: 361 }, (_, index) => index - 180);
-  const points = azimuthDegs.map((azDeg) => {
-    const gainDb = antennaPatternRelativeGainDb(pattern, patternParameters, azDeg, elevationDeg);
+  const variableAngles = cutMode === 'azimuth' ? Array.from({ length: 361 }, (_, index) => index - 180) : Array.from({ length: 181 }, (_, index) => index - 90);
+  const points = variableAngles.map((angleDeg) => {
+    const azOffset = cutMode === 'azimuth' ? angleDeg : fixedAngleDeg;
+    const elOffset = cutMode === 'azimuth' ? fixedAngleDeg : angleDeg;
+    const gainDb = antennaPatternRelativeGainDb(pattern, patternParameters, azOffset, elOffset);
     const normalized = Math.max(0, Math.min(1, (gainDb - minDb) / (0 - minDb)));
     const r = normalized * radius;
-    const theta = ((azDeg - 90) * Math.PI) / 180;
+    const theta = ((angleDeg - 90) * Math.PI) / 180;
     return `${(centerX + r * Math.cos(theta)).toFixed(2)},${(centerY + r * Math.sin(theta)).toFixed(2)}`;
   });
   const path = `M ${points.join(' L ')} Z`;
+  const subtitle = cutMode === 'azimuth' ? `Azimuth Cut at Elevation ${fixedAngleDeg.toFixed(1)}°` : `Elevation Cut at Azimuth ${fixedAngleDeg.toFixed(1)}°`;
 
   const rings = [0.25, 0.5, 0.75, 1].map((scale) => {
     const r = radius * scale;
@@ -3040,6 +3062,7 @@ function renderAntennaPatternPolarSvg(pattern: AntennaPattern, patternParameters
       <text x="${centerX - radius - 34}" y="${centerY + 4}" class="antenna-polar__label">-90°</text>
       <text x="${centerX - 8}" y="${centerY - radius - 8}" class="antenna-polar__label">0°</text>
       <text x="${centerX - 14}" y="${centerY + radius + 16}" class="antenna-polar__label">180°</text>
+      <text x="${centerX}" y="20" text-anchor="middle" class="antenna-polar__label">${escapeHtml(subtitle)}</text>
     </svg>
   `;
 }

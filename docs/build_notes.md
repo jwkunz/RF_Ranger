@@ -736,3 +736,21 @@
 - Known Issues / Next Focus:
   - None specific to this milestone.
 - Commit: this commit (`milestone(M53): antenna equation panel placement and binding v0.54.0`)
+
+## M54 - Antenna Visualization Cut Mode Toggle
+- Date: 2026-03-07
+- Version: 0.55.0
+- Completed:
+  - Replaced visualization `Pattern Type` selector with `Cut Mode` selector:
+    - `Azimuth Cut`
+    - `Elevation Cut`
+  - Updated plot generation to support both modes:
+    - Azimuth Cut: gain vs azimuth at fixed elevation
+    - Elevation Cut: gain vs elevation at fixed azimuth
+  - Converted slider to a fixed-angle control whose label/range changes by mode:
+    - `Fixed Elevation (deg)` for Azimuth Cut
+    - `Fixed Azimuth (deg)` for Elevation Cut
+  - Kept known-antenna selection support so visualization uses cached antenna pattern + parameters.
+- Known Issues / Next Focus:
+  - Optional future refinement: add explicit axis annotations for variable-angle domain in each cut mode.
+- Commit: this commit (`milestone(M54): antenna visualization cut mode toggle v0.55.0`)
