@@ -668,3 +668,23 @@
 - Known Issues / Next Focus:
   - Pattern expressions are currently encoded in worker logic; next milestone will add UI visualization and markdown equation pane for direct verification.
 - Commit: this commit (`milestone(M49): integrate 3d directional antenna gain math v0.50.0`)
+
+## M50 - Antenna Pattern Visualization + Equation Documentation Panel
+- Date: 2026-03-07
+- Version: 0.51.0
+- Completed:
+  - Added Antennas tab visualization panel with:
+    - pattern type selector
+    - elevation cut slider (`-90°` to `+90°`)
+    - live circular polar azimuth cut plot (relative gain in dBr)
+  - Added markdown + LaTeX documentation panel under the plot for each predefined antenna type:
+    - Omnidirectional
+    - Vertical Dipole
+    - Vertical Monopole
+    - Horizontal Dipole
+    - Horn
+  - Wired visualization to update live with selected pattern and elevation cut.
+  - Synced Add Antenna form pattern dropdown to the visualization selector for faster validation while configuring antennas.
+- Known Issues / Next Focus:
+  - Results/report fields for directional offsets and effective gains are not yet exposed; planned for next milestone.
+- Commit: this commit (`milestone(M50): antenna pattern visualization and docs panel v0.51.0`)

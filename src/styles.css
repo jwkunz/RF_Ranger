@@ -593,6 +593,62 @@ progress {
   overflow-wrap: anywhere;
 }
 
+.antenna-visualization {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.antenna-visualization__controls {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: end;
+}
+
+.antenna-visualization__plot {
+  border: 1px solid #64748b;
+  border-radius: 10px;
+  padding: 0.7rem;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.antenna-visualization__doc {
+  border-top: 1px solid #64748b;
+  padding-top: 0.8rem;
+}
+
+.antenna-polar {
+  width: min(420px, 100%);
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.antenna-polar__axis {
+  stroke: #64748b;
+  stroke-width: 1;
+}
+
+.antenna-polar__ring {
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.antenna-polar__trace {
+  fill: rgba(14, 116, 144, 0.28);
+  stroke: #0284c7;
+  stroke-width: 2;
+}
+
+.antenna-polar__label,
+.antenna-polar__ring-label {
+  fill: var(--fg);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 @media (max-width: 900px) {
   .manual {
     grid-template-columns: 1fr;
