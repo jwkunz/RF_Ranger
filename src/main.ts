@@ -1163,6 +1163,9 @@ function renderAntennasTab(): string {
           <label>${fixedAngleLabel}: <strong id="antenna-pattern-fixed-angle-value">${clampedFixedAngle.toFixed(1)}</strong>
             <input id="antenna-pattern-fixed-angle" type="range" min="${fixedAngleMin}" max="${fixedAngleMax}" step="1" value="${clampedFixedAngle}" />
           </label>
+          <label>Marker Angle (deg): <strong id="antenna-pattern-marker-angle-value">${clampedMarkerAngle.toFixed(1)}</strong>
+            <input id="antenna-pattern-marker-angle" type="range" min="${markerMin}" max="${markerMax}" step="1" value="${clampedMarkerAngle}" />
+          </label>
         </div>
         <p id="antenna-pattern-error" class="field-error"></p>
         <p class="muted">Marker Readout: <strong id="antenna-pattern-marker-readout">${clampedMarkerAngle.toFixed(1)}°, ${markerGainDb.toFixed(2)} dBr</strong> (drag marker on plot)</p>
@@ -2562,6 +2565,16 @@ function wireAntennaEvents(): void {
     const markerMax = antennaPatternCutMode === 'azimuth' ? 180 : 90;
     antennaPatternFixedAngleDeg = Math.max(fixedMin, Math.min(fixedMax, antennaPatternFixedAngleDeg));
     antennaPatternMarkerAngleDeg = Math.max(markerMin, Math.min(markerMax, antennaPatternMarkerAngleDeg));
+    const markerSlider = document.querySelector<HTMLInputElement>('#antenna-pattern-marker-angle');
+    if (markerSlider) {
+      markerSlider.min = String(markerMin);
+      markerSlider.max = String(markerMax);
+      markerSlider.value = String(antennaPatternMarkerAngleDeg);
+    }
+    const markerValueEl = document.querySelector<HTMLElement>('#antenna-pattern-marker-angle-value');
+    if (markerValueEl) {
+      markerValueEl.textContent = antennaPatternMarkerAngleDeg.toFixed(1);
+    }
     plot.innerHTML = renderAntennaPatternPolarSvg(pattern, parameters, antennaPatternCutMode, antennaPatternFixedAngleDeg, antennaPatternMarkerAngleDeg);
     const gainDb = antennaPatternRelativeGainDb(
       pattern,
@@ -2638,6 +2651,13 @@ function wireAntennaEvents(): void {
     if (valueEl) {
       valueEl.textContent = antennaPatternFixedAngleDeg.toFixed(1);
     }
+    updateAntennaPlot();
+    wireAntennaPlotDrag();
+  });
+
+  const markerAngleSlider = document.querySelector<HTMLInputElement>('#antenna-pattern-marker-angle');
+  markerAngleSlider?.addEventListener('input', () => {
+    antennaPatternMarkerAngleDeg = Number.parseFloat(markerAngleSlider.value);
     updateAntennaPlot();
     wireAntennaPlotDrag();
   });

@@ -778,3 +778,15 @@
 - Known Issues / Next Focus:
   - Optional future enhancement: highlight specific invalid fields in the Add Antenna panel in addition to summary error text.
 - Commit: this commit (`milestone(M56): live add-pattern preview and validation messaging v0.57.0`)
+
+## M57 - Marker Angle Linear Slider Control
+- Date: 2026-03-07
+- Version: 0.58.0
+- Completed:
+  - Added a traditional linear slider control for `Marker Angle (deg)` in the Pattern Visualization panel.
+  - Bound slider updates to marker movement/readout and plot refresh.
+  - Synced marker slider bounds/value dynamically with current cut mode constraints.
+  - Kept drag interaction and slider interaction synchronized both directions.
+- Known Issues / Next Focus:
+  - Optional: expose configurable angle-step size for marker slider and drag snapping.
+- Commit: this commit (`milestone(M57): add marker angle linear slider control v0.58.0`)
