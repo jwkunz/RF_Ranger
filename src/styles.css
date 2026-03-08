@@ -633,6 +633,7 @@ progress {
   height: auto;
   display: block;
   margin: 0 auto;
+  cursor: grab;
 }
 
 .antenna-polar__axis {
@@ -651,6 +652,12 @@ progress {
   fill: rgba(14, 116, 144, 0.28);
   stroke: #0284c7;
   stroke-width: 2;
+}
+
+.antenna-polar__marker {
+  fill: #f97316;
+  stroke: #fff;
+  stroke-width: 1.5;
 }
 
 .antenna-polar__label,

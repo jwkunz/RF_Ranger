@@ -754,3 +754,15 @@
 - Known Issues / Next Focus:
   - Optional future refinement: add explicit axis annotations for variable-angle domain in each cut mode.
 - Commit: this commit (`milestone(M54): antenna visualization cut mode toggle v0.55.0`)
+
+## M55 - Antenna Plot Draggable Marker Readout
+- Date: 2026-03-07
+- Version: 0.56.0
+- Completed:
+  - Added draggable marker interaction on antenna polar plot.
+  - Marker now moves with pointer drag and updates per active cut mode constraints.
+  - Added live marker readout showing variable-angle position and relative gain (dBr).
+  - Added marker rendering and plot cursor affordance styling.
+- Known Issues / Next Focus:
+  - Optional future refinement: snap marker to configurable angular increments.
+- Commit: this commit (`milestone(M55): add draggable marker readout to antenna plot v0.56.0`)
