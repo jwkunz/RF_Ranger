@@ -866,3 +866,15 @@
 - Known Issues / Next Focus:
   - Optional enhancement: add a CSV template download and stricter range validation UI for angle bounds.
 - Commit: this commit (`milestone(M62): add custom antenna CSV pattern import v0.63.0`)
+
+## M63 - Export Known Antenna Patterns to CSV
+- Date: 2026-03-07
+- Version: 0.64.0
+- Completed:
+  - Added `Export CSV` action next to `Edit` and `Delete` in the Known Antennas table.
+  - Implemented antenna pattern CSV export with schema: `azimuth_deg,elevation_deg,gain_dbi`.
+  - For `Custom CSV` antennas, export preserves stored points.
+  - For analytic antenna types, export generates sampled 3D pattern points (5° azimuth/elevation grid).
+- Known Issues / Next Focus:
+  - Optional enhancement: let users choose export resolution and coordinate frame.
+- Commit: this commit (`milestone(M63): add antenna pattern CSV export action v0.64.0`)

@@ -1048,7 +1048,7 @@ function renderAntennasTab(): string {
         <td><code>${escapeHtml(JSON.stringify(parameterSummary))}</code></td>
         <td>${(antenna.gainOverrideDb ?? defaultPeakGainDbiForPattern(antenna.pattern)).toFixed(2)}</td>
         <td>${escapeHtml(antenna.comments || '')}</td>
-        <td><button data-edit-antenna="${antenna.id}">Edit</button> <button data-delete-antenna="${antenna.id}">Delete</button></td>
+        <td><button data-edit-antenna="${antenna.id}">Edit</button> <button data-delete-antenna="${antenna.id}">Delete</button> <button data-export-antenna="${antenna.id}">Export CSV</button></td>
       </tr>`
       }
     )
@@ -2733,6 +2733,16 @@ function wireAntennaEvents(): void {
     });
   });
 
+  document.querySelectorAll<HTMLButtonElement>('[data-export-antenna]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const antenna = workspace.antennas.find((entry) => entry.id === button.dataset.exportAntenna);
+      if (!antenna) {
+        return;
+      }
+      exportAntennaPatternCsv(antenna);
+    });
+  });
+
   document.querySelectorAll<HTMLButtonElement>('[data-edit-antenna]').forEach((button) => {
     button.addEventListener('click', async () => {
       const antenna = workspace.antennas.find((entry) => entry.id === button.dataset.editAntenna);
@@ -3180,6 +3190,43 @@ function downloadDataUrl(dataUrl: string, fileName: string): void {
   anchor.href = dataUrl;
   anchor.download = fileName;
   anchor.click();
+}
+
+function downloadTextFile(content: string, fileName: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportAntennaPatternCsv(antenna: AntennaModel): void {
+  const rows: AntennaPatternPoint[] =
+    antenna.pattern === 'Custom CSV' && antenna.customPatternPoints?.length
+      ? antenna.customPatternPoints
+      : buildSampledAntennaPatternPoints(antenna);
+  const header = 'azimuth_deg,elevation_deg,gain_dbi';
+  const lines = rows.map((point) => `${point.azimuthDeg.toFixed(6)},${point.elevationDeg.toFixed(6)},${point.gainDbi.toFixed(6)}`);
+  const csv = [header, ...lines].join('\n');
+  const safeName = antenna.name.trim().replace(/[^a-z0-9-_]+/gi, '_').replace(/^_+|_+$/g, '') || 'antenna';
+  downloadTextFile(csv, `${safeName}-pattern.csv`, 'text/csv;charset=utf-8');
+}
+
+function buildSampledAntennaPatternPoints(antenna: AntennaModel): AntennaPatternPoint[] {
+  const points: AntennaPatternPoint[] = [];
+  const peakGainDbi = antenna.gainOverrideDb ?? defaultPeakGainDbiForPattern(antenna.pattern);
+  for (let elevationDeg = -90; elevationDeg <= 90; elevationDeg += 5) {
+    for (let azimuthDeg = -180; azimuthDeg <= 180; azimuthDeg += 5) {
+      points.push({
+        azimuthDeg,
+        elevationDeg,
+        gainDbi: antennaPatternGainDb(antenna.pattern, antenna.patternParameters, antenna.customPatternPoints ?? [], peakGainDbi, azimuthDeg, elevationDeg, 0, 0)
+      });
+    }
+  }
+  return points;
 }
 
 function renderAntennaPatternPolarSvg(
