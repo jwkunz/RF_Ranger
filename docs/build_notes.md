@@ -824,3 +824,19 @@
 - Known Issues / Next Focus:
   - Optional: add a user setting for visualization floor span (currently fixed at peak - 40 dB).
 - Commit: this commit (`milestone(M59): plot absolute gain in pattern visualization v0.60.0`)
+
+## M60 - Infinite-Ground Monopole Update + Antenna Reference File Source
+- Date: 2026-03-07
+- Version: 0.61.0
+- Completed:
+  - Updated vertical monopole model to represent a monopole over an infinite ground plane:
+    - upper-hemisphere pattern response retained
+    - below-ground-plane direction strongly suppressed
+  - Applied monopole behavior update in both:
+    - simulation worker gain implementation
+    - antenna visualization implementation
+  - Moved antenna equation/reference content to `docs/Antennas.md`.
+  - Updated Antennas tab to load and render reference text dynamically from `docs/Antennas.md` as single source of truth.
+- Known Issues / Next Focus:
+  - Optional future enhancement: expose monopole ground-plane suppression level as a configurable advanced parameter.
+- Commit: this commit (`milestone(M60): infinite-ground monopole and Antennas.md source v0.61.0`)

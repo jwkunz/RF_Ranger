@@ -300,7 +300,11 @@ function verticalDipoleAttenuationDb(elOffsetDeg: number, exponent: number): num
 }
 
 function verticalMonopoleAttenuationDb(elOffsetDeg: number, exponent: number): number {
-  // Monopole follows a similar broadside elevation pattern in upper hemisphere.
+  // Monopole over infinite ground plane: elevation pattern in upper hemisphere,
+  // with strong suppression below the ground plane.
+  if (Math.abs(elOffsetDeg) > 90) {
+    return 40;
+  }
   const power = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** Math.max(exponent, 0.1), 1e-6);
   return -10 * Math.log10(power);
 }

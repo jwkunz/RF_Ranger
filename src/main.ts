@@ -6,6 +6,7 @@ import 'katex/dist/katex.min.css';
 import legalMarkdown from '../docs/LEGAL.md?raw';
 import manualMarkdown from '../docs/Manual.md?raw';
 import modelsMarkdown from '../docs/Models.md?raw';
+import antennasMarkdown from '../docs/Antennas.md?raw';
 import MarkdownIt from 'markdown-it';
 import texmath from 'markdown-it-texmath';
 import katex from 'katex';
@@ -123,104 +124,6 @@ const propagationParameterMeta: Record<
   Troposcatter: {
     constantA: { label: 'Empirical Constant', symbol: 'A', units: 'dB', description: 'Empirical constant in troposcatter loss model.' }
   }
-};
-
-const ANTENNA_PATTERN_DOCS: Record<AntennaPattern, string> = {
-  Omnidirectional: `
-## Omnidirectional (3D)
-
-Idealized isotropic response with no directional attenuation:
-
-$$
-G(\\Delta\\phi,\\Delta\\theta) = G_0
-$$
-
-Relative gain:
-
-$$
-G_{rel}(\\Delta\\phi,\\Delta\\theta) = 0\\,\\mathrm{dB}
-$$
-`,
-  'Vertical Dipole': `
-## Vertical Dipole (3D Approximation)
-
-Broadside donut in elevation, approximated with:
-
-$$
-P(\\Delta\\theta) = \\cos^{n_v}(\\Delta\\theta)
-$$
-
-Attenuation:
-
-$$
-A(\\Delta\\theta) = -10\\log_{10}\\left(\\max(P(\\Delta\\theta),10^{-6})\\right)
-$$
-
-Where $n_v$ is the directivity exponent.
-
-Effective gain:
-
-$$
-G = G_0 - A
-$$
-`,
-  'Vertical Monopole': `
-## Vertical Monopole (3D Approximation)
-
-Upper-hemisphere broadside response using:
-
-$$
-P(\\Delta\\theta) = \\cos^{n_m}(\\Delta\\theta)
-$$
-
-Attenuation:
-
-$$
-A(\\Delta\\theta) = -10\\log_{10}\\left(\\max(P(\\Delta\\theta),10^{-6})\\right)
-$$
-A directivity exponent $n_m$ shapes main-lobe sharpness.
-
-`,
-  'Horizontal Dipole': `
-## Horizontal Dipole (3D Approximation)
-
-Figure-8 style azimuth behavior with elevation shaping:
-
-$$
-P(\\Delta\\phi,\\Delta\\theta) = \\cos^{n_{az}}(\\Delta\\phi)\\cos^{n_{el}}(\\Delta\\theta)
-$$
-
-Attenuation:
-
-$$
-A(\\Delta\\phi,\\Delta\\theta) = -10\\log_{10}\\left(\\max(P(\\Delta\\phi,\\Delta\\theta),10^{-6})\\right)
-$$
-`,
-  Horn: `
-## Rectangular Horn (3D Approximation)
-
-Peak gain is user-defined as $G_{peak}$ (dBi).
-
-Rectangular horn aperture dimensions:
-
-$$
-A = \\text{horn width},\\quad B = \\text{horn length}
-$$
-
-Approximate aperture-gain relation:
-
-$$
-G \\approx 10\\log_{10}\\left(\\eta\\frac{4\\pi AB}{\\lambda^2}\\right)
-$$
-
-Pattern attenuation approximation:
-
-$$
-A(\\Delta\\phi,\\Delta\\theta)=12\\left(\\frac{|\\Delta\\phi|}{\\phi_{3dB}}\\right)^2 + 12\\left(\\frac{|\\Delta\\theta|}{\\theta_{3dB}}\\right)^2
-$$
-
-with beamwidths inferred from aperture size.
-`
 };
 
 const antennaPatternParameterDefaults: Record<AntennaPattern, Record<string, number>> = {
@@ -1109,7 +1012,7 @@ function renderAntennasTab(): string {
     clampedFixedAngle,
     clampedMarkerAngle
   );
-  const patternReferenceHtml = renderModelGuideHtml(ANTENNA_PATTERN_DOCS[antennaPatternPreviewType]);
+  const patternReferenceHtml = renderModelGuideHtml(extractAntennaPatternSection(antennaPatternPreviewType, antennasMarkdown));
   const rows = workspace.antennas
     .map(
       (antenna) => `
@@ -3279,7 +3182,7 @@ function antennaPatternAttenuationDb(
     case 'Vertical Dipole':
       return cosineSquaredAttenuationDb(elevationOffsetDeg, patternParameters.directivityExponent ?? 2);
     case 'Vertical Monopole':
-      return cosineSquaredAttenuationDb(elevationOffsetDeg, patternParameters.directivityExponent ?? 2);
+      return verticalMonopoleGroundPlaneAttenuationDb(elevationOffsetDeg, patternParameters.directivityExponent ?? 2);
     case 'Horizontal Dipole': {
       const azPower = Math.max(Math.cos((azimuthOffsetDeg * Math.PI) / 180) ** Math.max(patternParameters.azimuthExponent ?? 2, 0.1), 1e-6);
       const elPower = Math.max(Math.cos((elevationOffsetDeg * Math.PI) / 180) ** Math.max(patternParameters.elevationExponent ?? 2, 0.1), 1e-6);
@@ -3304,6 +3207,13 @@ function antennaPatternAttenuationDb(
 function cosineSquaredAttenuationDb(angleDeg: number, exponent: number): number {
   const power = Math.max(Math.cos((angleDeg * Math.PI) / 180) ** Math.max(exponent, 0.1), 1e-6);
   return -10 * Math.log10(power);
+}
+
+function verticalMonopoleGroundPlaneAttenuationDb(angleDeg: number, exponent: number): number {
+  if (Math.abs(angleDeg) > 90) {
+    return 40;
+  }
+  return cosineSquaredAttenuationDb(angleDeg, exponent);
 }
 
 function renderManualWithToc(markdown: string): { tocHtml: string; bodyHtml: string } {
@@ -3421,6 +3331,38 @@ function extractPropagationModelSection(modelType: PropagationModelType, markdow
 
   if (matchIndex == null) {
     return `# ${modelType}\n\nNo setup text found in docs/Models.md for this model type yet.`;
+  }
+
+  const headingPosition = topHeadingIndexes.indexOf(matchIndex);
+  const endIndex = headingPosition >= 0 && headingPosition < topHeadingIndexes.length - 1 ? topHeadingIndexes[headingPosition + 1] : lines.length;
+  return lines.slice(matchIndex, endIndex).join('\n').trim();
+}
+
+function extractAntennaPatternSection(pattern: AntennaPattern, markdown: string): string {
+  const lines = markdown.split('\n');
+  const headingNeedles: Record<AntennaPattern, string[]> = {
+    Omnidirectional: ['omnidirectional'],
+    'Vertical Dipole': ['vertical dipole'],
+    'Vertical Monopole': ['vertical monopole'],
+    'Horizontal Dipole': ['horizontal dipole'],
+    Horn: ['rectangular horn', 'horn']
+  };
+
+  const topHeadingIndexes: number[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].startsWith('# ')) {
+      topHeadingIndexes.push(i);
+    }
+  }
+
+  const needles = headingNeedles[pattern].map((needle) => needle.toLowerCase());
+  const matchIndex = topHeadingIndexes.find((index) => {
+    const headingText = lines[index].slice(2).trim().toLowerCase();
+    return needles.some((needle) => headingText.includes(needle));
+  });
+
+  if (matchIndex == null) {
+    return `# ${antennaPatternDisplayName(pattern)}\n\nNo setup text found in docs/Antennas.md for this pattern yet.`;
   }
 
   const headingPosition = topHeadingIndexes.indexOf(matchIndex);
