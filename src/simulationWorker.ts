@@ -5,11 +5,25 @@ interface QueueSimulationInputItem {
   comments: string;
   txSite: Site;
   sourceRadio: RadioSource;
-  txAntenna: { heightM: number; azimuthDeg: number; tiltDeg: number; pattern: AntennaPattern; gainOverrideDb?: number };
+  txAntenna: {
+    heightM: number;
+    azimuthDeg: number;
+    tiltDeg: number;
+    pattern: AntennaPattern;
+    patternParameters: Record<string, number>;
+    gainOverrideDb?: number;
+  };
   propagationModel: PropagationModel;
   rxSite: Site;
   receiverRadio: RadioSink;
-  rxAntenna: { heightM: number; azimuthDeg: number; tiltDeg: number; pattern: AntennaPattern; gainOverrideDb?: number };
+  rxAntenna: {
+    heightM: number;
+    azimuthDeg: number;
+    tiltDeg: number;
+    pattern: AntennaPattern;
+    patternParameters: Record<string, number>;
+    gainOverrideDb?: number;
+  };
 }
 
 interface SimulationInput {
@@ -209,14 +223,20 @@ function thermalNoiseDensityDbmPerHz(temperatureK: number, noiseFigureDb: number
 }
 
 function directionalAntennaGainDb(
-  antenna: { pattern: AntennaPattern; gainOverrideDb?: number; azimuthDeg: number; tiltDeg: number },
+  antenna: {
+    pattern: AntennaPattern;
+    patternParameters: Record<string, number>;
+    gainOverrideDb?: number;
+    azimuthDeg: number;
+    tiltDeg: number;
+  },
   targetBearingDeg: number,
   targetElevationDeg: number
 ): number {
   const boresightGainDb = antennaBaseGainDb(antenna.pattern, antenna.gainOverrideDb);
   const azOffsetDeg = normalizedAngleDifferenceDeg(targetBearingDeg, antenna.azimuthDeg);
   const elOffsetDeg = normalizedAngleDifferenceDeg(targetElevationDeg, antenna.tiltDeg);
-  const attenuationDb = antennaPatternAttenuationDb(antenna.pattern, azOffsetDeg, elOffsetDeg);
+  const attenuationDb = antennaPatternAttenuationDb(antenna.pattern, antenna.patternParameters, azOffsetDeg, elOffsetDeg);
   return boresightGainDb - attenuationDb;
 }
 
@@ -240,7 +260,12 @@ function antennaBaseGainDb(pattern: AntennaPattern, gainOverrideDb?: number): nu
   }
 }
 
-function antennaPatternAttenuationDb(pattern: AntennaPattern, azOffsetDeg: number, elOffsetDeg: number): number {
+function antennaPatternAttenuationDb(
+  pattern: AntennaPattern,
+  patternParameters: Record<string, number>,
+  azOffsetDeg: number,
+  elOffsetDeg: number
+): number {
   const absAz = Math.abs(azOffsetDeg);
   const absEl = Math.abs(elOffsetDeg);
 
@@ -248,42 +273,45 @@ function antennaPatternAttenuationDb(pattern: AntennaPattern, azOffsetDeg: numbe
     case 'Omnidirectional':
       return 0;
     case 'Vertical Dipole':
-      return verticalDipoleAttenuationDb(elOffsetDeg);
+      return verticalDipoleAttenuationDb(elOffsetDeg, patternParameters.directivityExponent ?? 2);
     case 'Vertical Monopole':
-      return verticalMonopoleAttenuationDb(elOffsetDeg);
+      return verticalMonopoleAttenuationDb(elOffsetDeg, patternParameters.directivityExponent ?? 2);
     case 'Horizontal Dipole':
-      return horizontalDipoleAttenuationDb(azOffsetDeg, elOffsetDeg);
+      return horizontalDipoleAttenuationDb(azOffsetDeg, elOffsetDeg, patternParameters.azimuthExponent ?? 2, patternParameters.elevationExponent ?? 2);
     case 'Horn':
-      return hornAttenuationDb(absAz, absEl);
+      return hornAttenuationDb(absAz, absEl, patternParameters.az3dBBwDeg ?? 30, patternParameters.el3dBBwDeg ?? 30);
     default:
       return 0;
   }
 }
 
-function verticalDipoleAttenuationDb(elOffsetDeg: number): number {
+function verticalDipoleAttenuationDb(elOffsetDeg: number, exponent: number): number {
   // Donut pattern with max broadside at horizon: power ~ cos^2(elevation).
-  const power = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** 2, 1e-6);
+  const power = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** Math.max(exponent, 0.1), 1e-6);
   return -10 * Math.log10(power);
 }
 
-function verticalMonopoleAttenuationDb(elOffsetDeg: number): number {
+function verticalMonopoleAttenuationDb(elOffsetDeg: number, exponent: number): number {
   // Monopole follows a similar broadside elevation pattern in upper hemisphere.
-  const power = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** 2, 1e-6);
+  const power = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** Math.max(exponent, 0.1), 1e-6);
   return -10 * Math.log10(power);
 }
 
-function horizontalDipoleAttenuationDb(azOffsetDeg: number, elOffsetDeg: number): number {
+function horizontalDipoleAttenuationDb(
+  azOffsetDeg: number,
+  elOffsetDeg: number,
+  azimuthExponent: number,
+  elevationExponent: number
+): number {
   // Approximate 3D figure-8: broadside azimuth + horizon emphasis in elevation.
-  const azPower = Math.max(Math.cos(degreesToRadians(azOffsetDeg)) ** 2, 1e-6);
-  const elPower = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** 2, 1e-6);
+  const azPower = Math.max(Math.cos(degreesToRadians(azOffsetDeg)) ** Math.max(azimuthExponent, 0.1), 1e-6);
+  const elPower = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** Math.max(elevationExponent, 0.1), 1e-6);
   const power = Math.max(azPower * elPower, 1e-6);
   return -10 * Math.log10(power);
 }
 
-function hornAttenuationDb(absAzOffsetDeg: number, absElOffsetDeg: number): number {
+function hornAttenuationDb(absAzOffsetDeg: number, absElOffsetDeg: number, az3DbBwDeg: number, el3DbBwDeg: number): number {
   // Gaussian-like main lobe with conservative side-lobe floor.
-  const az3DbBwDeg = 30;
-  const el3DbBwDeg = 30;
   const attenuation =
     12 * (absAzOffsetDeg / Math.max(az3DbBwDeg, 0.1)) ** 2 + 12 * (absElOffsetDeg / Math.max(el3DbBwDeg, 0.1)) ** 2;
   return Math.min(attenuation, 40);

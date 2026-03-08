@@ -707,3 +707,20 @@
 - Known Issues / Next Focus:
   - Optional future refinement: allow user toggling visibility of advanced directional columns in Results.
 - Commit: this commit (`milestone(M51): expose directional offsets and effective gains v0.52.0`)
+
+## M52 - Antenna Tab 3-Column Refactor + Pattern Parameter Caching
+- Date: 2026-03-07
+- Version: 0.53.0
+- Completed:
+  - Refactored Antennas tab to a three-column layout:
+    - Data Entry
+    - Equations
+    - Pattern Visualization
+  - Added per-pattern parameter schema and parameter editor in the Data Entry column.
+  - Updated antenna model storage to persist `patternParameters` so pattern-specific inputs are cached in workspace data.
+  - Updated simulation worker directional gain calculations to consume cached pattern parameters (e.g., exponents, horn beamwidths).
+  - Updated visualization panel to support selecting known antennas for plot rendering using their cached pattern type and parameters.
+  - Added pattern equation markdown/LaTeX content aligned with implemented equations.
+- Known Issues / Next Focus:
+  - Bottom-equation-only view can be revisited if you want equations shown in just one place instead of both mid-column and reference section.
+- Commit: this commit (`milestone(M52): antenna tab three-column parameterized model refactor v0.53.0`)

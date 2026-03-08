@@ -63,6 +63,7 @@ export interface AntennaModel {
   tiltDeg: number;
   polarization: Polarization;
   pattern: AntennaPattern;
+  patternParameters: Record<string, number>;
   gainOverrideDb?: number;
 }
 

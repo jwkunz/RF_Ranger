@@ -232,6 +232,13 @@ fieldset.param-grid {
   align-items: start;
 }
 
+.antenna-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(320px, 1.1fr) minmax(280px, 0.9fr) minmax(320px, 1fr);
+  align-items: start;
+}
+
 .propagation-guide {
   border-left: 1px solid #94a3b8;
   padding-left: 0.9rem;
@@ -478,6 +485,10 @@ fieldset.param-grid {
   }
 
   .propagation-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .antenna-layout {
     grid-template-columns: 1fr;
   }
 

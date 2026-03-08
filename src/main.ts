@@ -147,7 +147,7 @@ $$
 Broadside donut in elevation, approximated with:
 
 $$
-P(\\Delta\\theta) = \\cos^2(\\Delta\\theta)
+P(\\Delta\\theta) = \\cos^{n_v}(\\Delta\\theta)
 $$
 
 Attenuation:
@@ -155,6 +155,8 @@ Attenuation:
 $$
 A(\\Delta\\theta) = -10\\log_{10}\\left(\\max(P(\\Delta\\theta),10^{-6})\\right)
 $$
+
+Where $n_v$ is the directivity exponent.
 
 Effective gain:
 
@@ -168,7 +170,7 @@ $$
 Upper-hemisphere broadside response using:
 
 $$
-P(\\Delta\\theta) = \\cos^2(\\Delta\\theta)
+P(\\Delta\\theta) = \\cos^{n_m}(\\Delta\\theta)
 $$
 
 Attenuation:
@@ -176,6 +178,8 @@ Attenuation:
 $$
 A(\\Delta\\theta) = -10\\log_{10}\\left(\\max(P(\\Delta\\theta),10^{-6})\\right)
 $$
+A directivity exponent $n_m$ shapes main-lobe sharpness.
+
 `,
   'Horizontal Dipole': `
 ## Horizontal Dipole (3D Approximation)
@@ -183,7 +187,7 @@ $$
 Figure-8 style azimuth behavior with elevation shaping:
 
 $$
-P(\\Delta\\phi,\\Delta\\theta) = \\cos^2(\\Delta\\phi)\\cos^2(\\Delta\\theta)
+P(\\Delta\\phi,\\Delta\\theta) = \\cos^{n_{az}}(\\Delta\\phi)\\cos^{n_{el}}(\\Delta\\theta)
 $$
 
 Attenuation:
@@ -213,6 +217,58 @@ $$
 A \\le 40\\,\\mathrm{dB}
 $$
 `
+};
+
+const antennaPatternParameterDefaults: Record<AntennaPattern, Record<string, number>> = {
+  Omnidirectional: {},
+  'Vertical Dipole': { directivityExponent: 2 },
+  'Vertical Monopole': { directivityExponent: 2 },
+  'Horizontal Dipole': { azimuthExponent: 2, elevationExponent: 2 },
+  Horn: { az3dBBwDeg: 30, el3dBBwDeg: 30 }
+};
+
+const antennaPatternParameterMeta: Record<AntennaPattern, Record<string, { label: string; units?: string; symbol: string; description: string }>> = {
+  Omnidirectional: {},
+  'Vertical Dipole': {
+    directivityExponent: {
+      label: 'Directivity Exponent',
+      symbol: 'n_v',
+      description: 'Higher values narrow the elevation main lobe.'
+    }
+  },
+  'Vertical Monopole': {
+    directivityExponent: {
+      label: 'Directivity Exponent',
+      symbol: 'n_m',
+      description: 'Higher values narrow the elevation main lobe.'
+    }
+  },
+  'Horizontal Dipole': {
+    azimuthExponent: {
+      label: 'Azimuth Exponent',
+      symbol: 'n_{az}',
+      description: 'Higher values narrow the azimuth cut response.'
+    },
+    elevationExponent: {
+      label: 'Elevation Exponent',
+      symbol: 'n_{el}',
+      description: 'Higher values narrow the elevation response.'
+    }
+  },
+  Horn: {
+    az3dBBwDeg: {
+      label: 'Azimuth 3 dB Beamwidth',
+      units: 'deg',
+      symbol: '\\phi_{3dB}',
+      description: 'Half-power beamwidth in azimuth.'
+    },
+    el3dBBwDeg: {
+      label: 'Elevation 3 dB Beamwidth',
+      units: 'deg',
+      symbol: '\\theta_{3dB}',
+      description: 'Half-power beamwidth in elevation.'
+    }
+  }
 };
 
 const modelGuideMarkdown = new MarkdownIt({ html: false, linkify: true, typographer: false }).use(texmath, {
@@ -408,6 +464,7 @@ let saveSiteViewAsPng = false;
 let selectedBaseMapId: BaseMapId = 'street';
 let antennaPatternPreviewType: AntennaPattern = 'Omnidirectional';
 let antennaPatternPreviewElevationDeg = 0;
+let selectedAntennaPreviewId = '';
 let selectedReportTreeIds = new Set<string>(
   REPORT_TREE.flatMap((category) => [category.id, ...category.fields.map((field) => field.id)])
 );
@@ -992,11 +1049,27 @@ function renderRadiosTab(): string {
 
 function renderAntennasTab(): string {
   const patternOptions: AntennaPattern[] = ['Omnidirectional', 'Vertical Dipole', 'Vertical Monopole', 'Horizontal Dipole', 'Horn'];
+  const previewAntenna = workspace.antennas.find((antenna) => antenna.id === selectedAntennaPreviewId) ?? workspace.antennas[0] ?? null;
+  const effectivePreviewPattern = previewAntenna?.pattern ?? antennaPatternPreviewType;
+  const effectivePreviewParams = previewAntenna?.patternParameters ?? antennaPatternParameterDefaults[effectivePreviewPattern];
   const previewPatternOptions = patternOptions
     .map((pattern) => `<option value="${pattern}" ${pattern === antennaPatternPreviewType ? 'selected' : ''}>${pattern}</option>`)
     .join('');
-  const previewSvg = renderAntennaPatternPolarSvg(antennaPatternPreviewType, antennaPatternPreviewElevationDeg);
-  const previewDocHtml = renderModelGuideHtml(ANTENNA_PATTERN_DOCS[antennaPatternPreviewType]);
+  const previewAntennaOptions = workspace.antennas
+    .map((antenna) => `<option value="${antenna.id}" ${previewAntenna?.id === antenna.id ? 'selected' : ''}>${escapeHtml(antenna.name)} (${antenna.pattern})</option>`)
+    .join('');
+  const parameterInputs = Object.entries(antennaPatternParameterDefaults[antennaPatternPreviewType])
+    .map(([key, defaultValue]) => {
+      const meta = antennaPatternParameterMeta[antennaPatternPreviewType]?.[key];
+      const units = meta?.units ? `, ${escapeHtml(meta.units)}` : '';
+      const symbol = meta ? renderMathInline(meta.symbol) : '';
+      const label = meta ? `${escapeHtml(meta.label)} <span class="field-symbol">(${symbol}${units})</span>` : escapeHtml(prettyLabel(key));
+      const description = meta?.description ? `<small class="field-help">${escapeHtml(meta.description)}</small>` : '';
+      return `<label>${label}<input data-antenna-param="${key}" type="number" step="0.0001" value="${defaultValue}" />${description}</label>`;
+    })
+    .join('');
+  const previewSvg = renderAntennaPatternPolarSvg(effectivePreviewPattern, effectivePreviewParams, antennaPatternPreviewElevationDeg);
+  const previewDocHtml = renderModelGuideHtml(ANTENNA_PATTERN_DOCS[effectivePreviewPattern]);
   const rows = workspace.antennas
     .map(
       (antenna) => `
@@ -1007,6 +1080,7 @@ function renderAntennasTab(): string {
         <td>${antenna.tiltDeg}</td>
         <td>${antenna.polarization}</td>
         <td>${antenna.pattern}</td>
+        <td><code>${escapeHtml(JSON.stringify(antenna.patternParameters))}</code></td>
         <td>${antenna.gainOverrideDb ?? 'default'}</td>
         <td>${escapeHtml(antenna.comments || '')}</td>
         <td><button data-edit-antenna="${antenna.id}">Edit</button> <button data-delete-antenna="${antenna.id}">Delete</button></td>
@@ -1016,53 +1090,63 @@ function renderAntennasTab(): string {
 
   return `
     <h2>Antennas</h2>
-    <section class="panel">
-      <h3>Add Antenna</h3>
-      <form id="add-antenna-form" class="grid-form">
-        <label>Name<input name="name" placeholder="Antenna name" required /></label>
-        <label>Height (m)<input name="heightM" type="number" step="0.1" required /></label>
-        <label>Azimuth (deg)<input name="azimuthDeg" type="number" step="0.1" required /></label>
-        <label>Tilt (deg)<input name="tiltDeg" type="number" step="0.1" required /></label>
-        <label>Polarization
-          <select name="polarization">
-            <option>Vertical</option>
-            <option>Horizontal</option>
-            <option>Circular</option>
-          </select>
-        </label>
-        <label>Pattern
-          <select name="pattern">
-            <option>Omnidirectional</option>
-            <option>Vertical Dipole</option>
-            <option>Vertical Monopole</option>
-            <option>Horizontal Dipole</option>
-            <option>Horn</option>
-          </select>
-        </label>
-        <label>Gain Override (dB, optional)<input name="gainOverrideDb" type="number" step="0.1" /></label>
-        <label>Comments<textarea name="comments" rows="2" placeholder="Antenna notes"></textarea></label>
-        <button class="primary-btn" type="submit">Add Antenna</button>
-      </form>
+    <section class="panel antenna-layout">
+      <div>
+        <h3>Add Antenna</h3>
+        <form id="add-antenna-form" class="stack">
+          <label>Name<input name="name" placeholder="Antenna name" required /></label>
+          <label>Height (m)<input name="heightM" type="number" step="0.1" required /></label>
+          <label>Azimuth (deg)<input name="azimuthDeg" type="number" step="0.1" required /></label>
+          <label>Tilt (deg)<input name="tiltDeg" type="number" step="0.1" required /></label>
+          <label>Polarization
+            <select name="polarization">
+              <option>Vertical</option>
+              <option>Horizontal</option>
+              <option>Circular</option>
+            </select>
+          </label>
+          <label>Pattern
+            <select name="pattern" id="antenna-pattern-form">${previewPatternOptions}</select>
+          </label>
+          <fieldset class="param-grid">
+            <legend>Pattern Parameters</legend>
+            ${parameterInputs || '<p class="muted">No additional parameters for this pattern.</p>'}
+          </fieldset>
+          <label>Gain Override (dB, optional)<input name="gainOverrideDb" type="number" step="0.1" /></label>
+          <label>Comments<textarea name="comments" rows="2" placeholder="Antenna notes"></textarea></label>
+          <button class="primary-btn" type="submit">Add Antenna</button>
+        </form>
+      </div>
+      <aside class="propagation-guide">
+        <h3>Pattern Equations</h3>
+        <div class="manual__body">${previewDocHtml}</div>
+      </aside>
+      <aside class="antenna-visualization">
+        <h3>Pattern Visualization</h3>
+        <div class="antenna-visualization__controls">
+          <label>Known Antenna
+            <select id="antenna-preview-id">${previewAntennaOptions || '<option value="">No known antennas</option>'}</select>
+          </label>
+          <label>Pattern Type
+            <select id="antenna-pattern-preview-select">${previewPatternOptions}</select>
+          </label>
+          <label>Elevation Cut (deg): <strong id="antenna-pattern-elevation-value">${antennaPatternPreviewElevationDeg.toFixed(1)}</strong>
+            <input id="antenna-pattern-elevation" type="range" min="-90" max="90" step="1" value="${antennaPatternPreviewElevationDeg}" />
+          </label>
+        </div>
+        <div class="antenna-visualization__plot">${previewSvg}</div>
+      </aside>
     </section>
     <section class="panel">
       <h3>Known Antennas</h3>
       <table>
-        <thead><tr><th>Name</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Gain</th><th>Comments</th><th>Actions</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="9">No antennas yet.</td></tr>'}</tbody>
+        <thead><tr><th>Name</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Pattern Parameters</th><th>Gain</th><th>Comments</th><th>Actions</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="10">No antennas yet.</td></tr>'}</tbody>
       </table>
     </section>
-    <section class="panel antenna-visualization">
-      <h3>Pattern Visualization</h3>
-      <div class="antenna-visualization__controls">
-        <label>Pattern Type
-          <select id="antenna-pattern-preview-select">${previewPatternOptions}</select>
-        </label>
-        <label>Elevation Cut (deg): <strong id="antenna-pattern-elevation-value">${antennaPatternPreviewElevationDeg.toFixed(1)}</strong>
-          <input id="antenna-pattern-elevation" type="range" min="-90" max="90" step="1" value="${antennaPatternPreviewElevationDeg}" />
-        </label>
-      </div>
-      <div class="antenna-visualization__plot">${previewSvg}</div>
-      <div class="antenna-visualization__doc manual__body">${previewDocHtml}</div>
+    <section class="panel">
+      <h3>Pattern Equation Reference</h3>
+      <div class="manual__body">${previewDocHtml}</div>
     </section>
   `;
 }
@@ -2407,9 +2491,20 @@ function wireRadiosEvents(): void {
 }
 
 function wireAntennaEvents(): void {
+  const previewByKnownAntenna = document.querySelector<HTMLSelectElement>('#antenna-preview-id');
+  previewByKnownAntenna?.addEventListener('change', () => {
+    selectedAntennaPreviewId = previewByKnownAntenna.value;
+    const selected = workspace.antennas.find((antenna) => antenna.id === selectedAntennaPreviewId);
+    if (selected) {
+      antennaPatternPreviewType = selected.pattern;
+    }
+    render();
+  });
+
   const previewPatternSelect = document.querySelector<HTMLSelectElement>('#antenna-pattern-preview-select');
   previewPatternSelect?.addEventListener('change', () => {
     antennaPatternPreviewType = previewPatternSelect.value as AntennaPattern;
+    selectedAntennaPreviewId = '';
     render();
   });
 
@@ -2422,19 +2517,30 @@ function wireAntennaEvents(): void {
     }
     const plot = document.querySelector<HTMLDivElement>('.antenna-visualization__plot');
     if (plot) {
-      plot.innerHTML = renderAntennaPatternPolarSvg(antennaPatternPreviewType, antennaPatternPreviewElevationDeg);
+      const selected = workspace.antennas.find((antenna) => antenna.id === selectedAntennaPreviewId);
+      const pattern = selected?.pattern ?? antennaPatternPreviewType;
+      const parameters = selected?.patternParameters ?? antennaPatternParameterDefaults[pattern];
+      plot.innerHTML = renderAntennaPatternPolarSvg(pattern, parameters, antennaPatternPreviewElevationDeg);
     }
   });
 
   const form = document.querySelector<HTMLFormElement>('#add-antenna-form');
-  form?.querySelector<HTMLSelectElement>('select[name="pattern"]')?.addEventListener('change', (event) => {
+  form?.querySelector<HTMLSelectElement>('#antenna-pattern-form')?.addEventListener('change', (event) => {
     antennaPatternPreviewType = (event.target as HTMLSelectElement).value as AntennaPattern;
+    selectedAntennaPreviewId = '';
     render();
   });
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
     const rawGain = String(data.get('gainOverrideDb') ?? '').trim();
+    const pattern = String(data.get('pattern')) as AntennaPattern;
+    const patternParameters = Object.fromEntries(
+      Array.from(document.querySelectorAll<HTMLInputElement>('[data-antenna-param]')).map((input) => [
+        String(input.dataset.antennaParam),
+        Number.parseFloat(input.value)
+      ])
+    );
     const antenna: AntennaModel = {
       id: uid(),
       name: String(data.get('name') ?? ''),
@@ -2443,10 +2549,13 @@ function wireAntennaEvents(): void {
       azimuthDeg: toNumber(data.get('azimuthDeg')),
       tiltDeg: toNumber(data.get('tiltDeg')),
       polarization: String(data.get('polarization')) as Polarization,
-      pattern: String(data.get('pattern')) as AntennaPattern,
+      pattern,
+      patternParameters,
       gainOverrideDb: rawGain ? Number.parseFloat(rawGain) : undefined
     };
     workspace.antennas.push(antenna);
+    selectedAntennaPreviewId = antenna.id;
+    antennaPatternPreviewType = antenna.pattern;
     await saveWorkspace(workspace);
     render();
   });
@@ -2455,6 +2564,9 @@ function wireAntennaEvents(): void {
     button.addEventListener('click', async () => {
       const id = button.dataset.deleteAntenna;
       workspace.antennas = workspace.antennas.filter((entry) => entry.id !== id);
+      if (selectedAntennaPreviewId === id) {
+        selectedAntennaPreviewId = workspace.antennas[0]?.id ?? '';
+      }
       await saveWorkspace(workspace);
       render();
     });
@@ -2588,7 +2700,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     schemaVersion?: number;
     sources?: Array<RadioSource & { comments?: string }>;
     sinks?: Array<RadioSink & { environmentNoiseTemperatureK?: number; noiseFigureDb?: number; requiredSnrDb?: number }>;
-    antennas?: Array<AntennaModel & { comments?: string }>;
+    antennas?: Array<AntennaModel & { comments?: string; patternParameters?: Record<string, number> }>;
     propagationModels?: Array<PropagationModel & { comments?: string }>;
     sites?: Site[];
     pins?: Array<{
@@ -2626,7 +2738,8 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
 
   const antennas = (work.antennas ?? []).map((antenna) => ({
     ...antenna,
-    comments: antenna.comments ?? ''
+    comments: antenna.comments ?? '',
+    patternParameters: normalizeAntennaPatternParameters(antenna.pattern, antenna.patternParameters)
   }));
 
   const propagationModels = (work.propagationModels ?? []).map((model) => ({
@@ -2762,6 +2875,9 @@ function ensureSelectionDefaults(): void {
   if (!workspace.antennas.some((entry) => entry.id === selectedSimulationRxAntennaId)) {
     selectedSimulationRxAntennaId = workspace.antennas[0]?.id ?? '';
   }
+  if (!workspace.antennas.some((entry) => entry.id === selectedAntennaPreviewId)) {
+    selectedAntennaPreviewId = workspace.antennas[0]?.id ?? '';
+  }
   if (!workspace.propagationModels.some((entry) => entry.id === selectedPropagationModelId)) {
     selectedPropagationModelId = workspace.propagationModels[0]?.id ?? '';
   }
@@ -2894,7 +3010,7 @@ function downloadDataUrl(dataUrl: string, fileName: string): void {
   anchor.click();
 }
 
-function renderAntennaPatternPolarSvg(pattern: AntennaPattern, elevationDeg: number): string {
+function renderAntennaPatternPolarSvg(pattern: AntennaPattern, patternParameters: Record<string, number>, elevationDeg: number): string {
   const width = 360;
   const height = 360;
   const centerX = width / 2;
@@ -2903,7 +3019,7 @@ function renderAntennaPatternPolarSvg(pattern: AntennaPattern, elevationDeg: num
   const minDb = -40;
   const azimuthDegs = Array.from({ length: 361 }, (_, index) => index - 180);
   const points = azimuthDegs.map((azDeg) => {
-    const gainDb = antennaPatternRelativeGainDb(pattern, azDeg, elevationDeg);
+    const gainDb = antennaPatternRelativeGainDb(pattern, patternParameters, azDeg, elevationDeg);
     const normalized = Math.max(0, Math.min(1, (gainDb - minDb) / (0 - minDb)));
     const r = normalized * radius;
     const theta = ((azDeg - 90) * Math.PI) / 180;
@@ -2932,29 +3048,39 @@ function renderAntennaPatternPolarSvg(pattern: AntennaPattern, elevationDeg: num
   `;
 }
 
-function antennaPatternRelativeGainDb(pattern: AntennaPattern, azimuthOffsetDeg: number, elevationOffsetDeg: number): number {
-  const attenuationDb = antennaPatternAttenuationDb(pattern, azimuthOffsetDeg, elevationOffsetDeg);
+function antennaPatternRelativeGainDb(
+  pattern: AntennaPattern,
+  patternParameters: Record<string, number>,
+  azimuthOffsetDeg: number,
+  elevationOffsetDeg: number
+): number {
+  const attenuationDb = antennaPatternAttenuationDb(pattern, patternParameters, azimuthOffsetDeg, elevationOffsetDeg);
   return -attenuationDb;
 }
 
-function antennaPatternAttenuationDb(pattern: AntennaPattern, azimuthOffsetDeg: number, elevationOffsetDeg: number): number {
+function antennaPatternAttenuationDb(
+  pattern: AntennaPattern,
+  patternParameters: Record<string, number>,
+  azimuthOffsetDeg: number,
+  elevationOffsetDeg: number
+): number {
   const absAz = Math.abs(azimuthOffsetDeg);
   const absEl = Math.abs(elevationOffsetDeg);
   switch (pattern) {
     case 'Omnidirectional':
       return 0;
     case 'Vertical Dipole':
-      return cosineSquaredAttenuationDb(elevationOffsetDeg);
+      return cosineSquaredAttenuationDb(elevationOffsetDeg, patternParameters.directivityExponent ?? 2);
     case 'Vertical Monopole':
-      return cosineSquaredAttenuationDb(elevationOffsetDeg);
+      return cosineSquaredAttenuationDb(elevationOffsetDeg, patternParameters.directivityExponent ?? 2);
     case 'Horizontal Dipole': {
-      const azPower = Math.max(Math.cos((azimuthOffsetDeg * Math.PI) / 180) ** 2, 1e-6);
-      const elPower = Math.max(Math.cos((elevationOffsetDeg * Math.PI) / 180) ** 2, 1e-6);
+      const azPower = Math.max(Math.cos((azimuthOffsetDeg * Math.PI) / 180) ** Math.max(patternParameters.azimuthExponent ?? 2, 0.1), 1e-6);
+      const elPower = Math.max(Math.cos((elevationOffsetDeg * Math.PI) / 180) ** Math.max(patternParameters.elevationExponent ?? 2, 0.1), 1e-6);
       return -10 * Math.log10(Math.max(azPower * elPower, 1e-6));
     }
     case 'Horn': {
-      const az3Db = 30;
-      const el3Db = 30;
+      const az3Db = patternParameters.az3dBBwDeg ?? 30;
+      const el3Db = patternParameters.el3dBBwDeg ?? 30;
       const attenuation = 12 * (absAz / az3Db) ** 2 + 12 * (absEl / el3Db) ** 2;
       return Math.min(attenuation, 40);
     }
@@ -2963,8 +3089,8 @@ function antennaPatternAttenuationDb(pattern: AntennaPattern, azimuthOffsetDeg: 
   }
 }
 
-function cosineSquaredAttenuationDb(angleDeg: number): number {
-  const power = Math.max(Math.cos((angleDeg * Math.PI) / 180) ** 2, 1e-6);
+function cosineSquaredAttenuationDb(angleDeg: number, exponent: number): number {
+  const power = Math.max(Math.cos((angleDeg * Math.PI) / 180) ** Math.max(exponent, 0.1), 1e-6);
   return -10 * Math.log10(power);
 }
 
@@ -3111,6 +3237,15 @@ function prettyLabel(value: string): string {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (s) => s.toUpperCase())
     .trim();
+}
+
+function normalizeAntennaPatternParameters(pattern: AntennaPattern, raw?: Record<string, number>): Record<string, number> {
+  const defaults = antennaPatternParameterDefaults[pattern];
+  const entries = Object.entries(defaults).map(([key, defaultValue]) => {
+    const candidate = raw?.[key];
+    return [key, Number.isFinite(candidate) ? Number(candidate) : defaultValue];
+  });
+  return Object.fromEntries(entries);
 }
 
 function uniqueBy(values: string[]): string[] {
