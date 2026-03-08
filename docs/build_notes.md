@@ -840,3 +840,15 @@
 - Known Issues / Next Focus:
   - Optional future enhancement: expose monopole ground-plane suppression level as a configurable advanced parameter.
 - Commit: this commit (`milestone(M60): infinite-ground monopole and Antennas.md source v0.61.0`)
+
+## M61 - Remove Polarization + Boresight-Aware Visualization
+- Date: 2026-03-07
+- Version: 0.62.0
+- Completed:
+  - Removed antenna polarization from the data model and Antennas UI.
+  - Renamed antenna azimuth labeling to `Borsight Azimuth (deg)` across entry forms, tables, and report metadata trees.
+  - Updated pattern visualization math to apply boresight azimuth and tilt offsets when evaluating gain, so the plotted cut reflects antenna pointing.
+  - Updated antenna report text/rendering to remove polarization lines and keep naming consistent with boresight terminology.
+- Known Issues / Next Focus:
+  - Optional enhancement: expose explicit world-frame cut controls for side-by-side comparison of raw pattern vs boresight-rotated pattern.
+- Commit: this commit (`milestone(M61): remove polarization and apply boresight-aware visualization v0.62.0`)

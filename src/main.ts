@@ -18,7 +18,6 @@ import { loadWorkspace, saveWorkspace } from './storage';
 import type {
   AntennaModel,
   AntennaPattern,
-  Polarization,
   PropagationModel,
   PropagationModelType,
   RadioSink,
@@ -256,9 +255,8 @@ const REPORT_TREE: ReportTreeCategory[] = [
       { id: 'txAntennaName', label: 'Name' },
       { id: 'txAntennaComments', label: 'Comments' },
       { id: 'txAntennaHeight', label: 'Height (m)' },
-      { id: 'txAntennaAzimuth', label: 'Azimuth (deg)' },
+      { id: 'txAntennaAzimuth', label: 'Borsight Azimuth (deg)' },
       { id: 'txAntennaTilt', label: 'Tilt (deg)' },
-      { id: 'txAntennaPolarization', label: 'Polarization' },
       { id: 'txAntennaPattern', label: 'Pattern' },
       { id: 'txAntennaGain', label: 'Peak Gain (dBi)' }
     ]
@@ -293,9 +291,8 @@ const REPORT_TREE: ReportTreeCategory[] = [
       { id: 'rxAntennaName', label: 'Name' },
       { id: 'rxAntennaComments', label: 'Comments' },
       { id: 'rxAntennaHeight', label: 'Height (m)' },
-      { id: 'rxAntennaAzimuth', label: 'Azimuth (deg)' },
+      { id: 'rxAntennaAzimuth', label: 'Borsight Azimuth (deg)' },
       { id: 'rxAntennaTilt', label: 'Tilt (deg)' },
-      { id: 'rxAntennaPolarization', label: 'Polarization' },
       { id: 'rxAntennaPattern', label: 'Pattern' },
       { id: 'rxAntennaGain', label: 'Peak Gain (dBi)' }
     ]
@@ -1002,7 +999,9 @@ function renderAntennasTab(): string {
     effectivePreviewParams,
     previewPeakGainDbi,
     antennaPatternCutMode === 'azimuth' ? clampedMarkerAngle : clampedFixedAngle,
-    antennaPatternCutMode === 'azimuth' ? clampedFixedAngle : clampedMarkerAngle
+    antennaPatternCutMode === 'azimuth' ? clampedFixedAngle : clampedMarkerAngle,
+    previewAntenna?.azimuthDeg ?? 0,
+    previewAntenna?.tiltDeg ?? 0
   );
   const previewSvg = renderAntennaPatternPolarSvg(
     effectivePreviewPattern,
@@ -1010,7 +1009,9 @@ function renderAntennasTab(): string {
     previewPeakGainDbi,
     antennaPatternCutMode,
     clampedFixedAngle,
-    clampedMarkerAngle
+    clampedMarkerAngle,
+    previewAntenna?.azimuthDeg ?? 0,
+    previewAntenna?.tiltDeg ?? 0
   );
   const patternReferenceHtml = renderModelGuideHtml(extractAntennaPatternSection(antennaPatternPreviewType, antennasMarkdown));
   const rows = workspace.antennas
@@ -1021,7 +1022,6 @@ function renderAntennasTab(): string {
         <td>${antenna.heightM}</td>
         <td>${antenna.azimuthDeg}</td>
         <td>${antenna.tiltDeg}</td>
-        <td>${antenna.polarization}</td>
         <td>${escapeHtml(antennaPatternDisplayName(antenna.pattern))}</td>
         <td><code>${escapeHtml(JSON.stringify(antenna.patternParameters))}</code></td>
         <td>${(antenna.gainOverrideDb ?? defaultPeakGainDbiForPattern(antenna.pattern)).toFixed(2)}</td>
@@ -1039,15 +1039,8 @@ function renderAntennasTab(): string {
         <form id="add-antenna-form" class="stack">
           <label>Name<input name="name" placeholder="Antenna name" required /></label>
           <label>Height (m)<input name="heightM" type="number" step="0.1" required /></label>
-          <label>Azimuth (deg)<input name="azimuthDeg" type="number" step="0.1" required /></label>
+          <label>Borsight Azimuth (deg)<input name="azimuthDeg" type="number" step="0.1" required /></label>
           <label>Tilt (deg)<input name="tiltDeg" type="number" step="0.1" required /></label>
-          <label>Polarization
-            <select name="polarization">
-              <option>Vertical</option>
-              <option>Horizontal</option>
-              <option>Circular</option>
-            </select>
-          </label>
           <label>Pattern
             <select name="pattern" id="antenna-pattern-form">${previewPatternOptions}</select>
           </label>
@@ -1088,8 +1081,8 @@ function renderAntennasTab(): string {
     <section class="panel">
       <h3>Known Antennas</h3>
       <table>
-        <thead><tr><th>Name</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Pattern Parameters</th><th>Peak Gain (dBi)</th><th>Comments</th><th>Actions</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="10">No antennas yet.</td></tr>'}</tbody>
+        <thead><tr><th>Name</th><th>Height</th><th>Borsight Azimuth</th><th>Tilt</th><th>Pattern</th><th>Pattern Parameters</th><th>Peak Gain (dBi)</th><th>Comments</th><th>Actions</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="9">No antennas yet.</td></tr>'}</tbody>
       </table>
     </section>
   `;
@@ -1737,10 +1730,9 @@ async function generatePdfReport(): Promise<void> {
           if (selectedReportTreeIds.has('txAntennaName')) lines.push(`Name: ${antenna.name}`);
           if (selectedReportTreeIds.has('txAntennaComments')) lines.push(`Comments: ${antenna.comments || 'None'}`);
           if (selectedReportTreeIds.has('txAntennaHeight')) lines.push(`Height: ${antenna.heightM} m`);
-          if (selectedReportTreeIds.has('txAntennaAzimuth')) lines.push(`Azimuth: ${antenna.azimuthDeg} deg`);
+          if (selectedReportTreeIds.has('txAntennaAzimuth')) lines.push(`Borsight Azimuth: ${antenna.azimuthDeg} deg`);
           if (selectedReportTreeIds.has('txAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
-          if (selectedReportTreeIds.has('txAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
-          if (selectedReportTreeIds.has('txAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
+          if (selectedReportTreeIds.has('txAntennaPattern')) lines.push(`Pattern: ${antennaPatternDisplayName(antenna.pattern)}`);
           if (selectedReportTreeIds.has('txAntennaGain'))
             lines.push(`Peak Gain: ${(antenna.gainOverrideDb ?? defaultPeakGainDbiForPattern(antenna.pattern)).toFixed(2)} dBi`);
           lines.forEach((line) => writeWrapped(`- ${line}`));
@@ -1794,10 +1786,9 @@ async function generatePdfReport(): Promise<void> {
           if (selectedReportTreeIds.has('rxAntennaName')) lines.push(`Name: ${antenna.name}`);
           if (selectedReportTreeIds.has('rxAntennaComments')) lines.push(`Comments: ${antenna.comments || 'None'}`);
           if (selectedReportTreeIds.has('rxAntennaHeight')) lines.push(`Height: ${antenna.heightM} m`);
-          if (selectedReportTreeIds.has('rxAntennaAzimuth')) lines.push(`Azimuth: ${antenna.azimuthDeg} deg`);
+          if (selectedReportTreeIds.has('rxAntennaAzimuth')) lines.push(`Borsight Azimuth: ${antenna.azimuthDeg} deg`);
           if (selectedReportTreeIds.has('rxAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
-          if (selectedReportTreeIds.has('rxAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
-          if (selectedReportTreeIds.has('rxAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
+          if (selectedReportTreeIds.has('rxAntennaPattern')) lines.push(`Pattern: ${antennaPatternDisplayName(antenna.pattern)}`);
           if (selectedReportTreeIds.has('rxAntennaGain'))
             lines.push(`Peak Gain: ${(antenna.gainOverrideDb ?? defaultPeakGainDbiForPattern(antenna.pattern)).toFixed(2)} dBi`);
           lines.forEach((line) => writeWrapped(`- ${line}`));
@@ -2447,12 +2438,16 @@ function wireAntennaEvents(): void {
     let pattern: AntennaPattern;
     let parameters: Record<string, number>;
     let peakGainDbi: number;
+    let boresightAzimuthDeg = 0;
+    let boresightTiltDeg = 0;
     let errorMessage = '';
 
     if (selected) {
       pattern = selected.pattern;
       parameters = selected.patternParameters ?? antennaPatternParameterDefaults[pattern];
       peakGainDbi = selected.gainOverrideDb ?? defaultPeakGainDbiForPattern(pattern);
+      boresightAzimuthDeg = selected.azimuthDeg;
+      boresightTiltDeg = selected.tiltDeg;
     } else {
       const form = document.querySelector<HTMLFormElement>('#add-antenna-form');
       const patternFromForm = form?.querySelector<HTMLSelectElement>('#antenna-pattern-form')?.value as AntennaPattern | undefined;
@@ -2481,6 +2476,16 @@ function wireAntennaEvents(): void {
         } else {
           parameters[key] = parsed;
         }
+      }
+      const rawAzimuth = form?.querySelector<HTMLInputElement>('input[name="azimuthDeg"]')?.value?.trim() ?? '';
+      const rawTilt = form?.querySelector<HTMLInputElement>('input[name="tiltDeg"]')?.value?.trim() ?? '';
+      const parsedAzimuth = Number.parseFloat(rawAzimuth);
+      const parsedTilt = Number.parseFloat(rawTilt);
+      if (rawAzimuth && Number.isFinite(parsedAzimuth)) {
+        boresightAzimuthDeg = parsedAzimuth;
+      }
+      if (rawTilt && Number.isFinite(parsedTilt)) {
+        boresightTiltDeg = parsedTilt;
       }
     }
 
@@ -2511,14 +2516,18 @@ function wireAntennaEvents(): void {
       peakGainDbi,
       antennaPatternCutMode,
       antennaPatternFixedAngleDeg,
-      antennaPatternMarkerAngleDeg
+      antennaPatternMarkerAngleDeg,
+      boresightAzimuthDeg,
+      boresightTiltDeg
     );
     const gainDb = antennaPatternGainDb(
       pattern,
       parameters,
       peakGainDbi,
       antennaPatternCutMode === 'azimuth' ? antennaPatternMarkerAngleDeg : antennaPatternFixedAngleDeg,
-      antennaPatternCutMode === 'azimuth' ? antennaPatternFixedAngleDeg : antennaPatternMarkerAngleDeg
+      antennaPatternCutMode === 'azimuth' ? antennaPatternFixedAngleDeg : antennaPatternMarkerAngleDeg,
+      boresightAzimuthDeg,
+      boresightTiltDeg
     );
     const readout = document.querySelector<HTMLElement>('#antenna-pattern-marker-readout');
     if (readout) {
@@ -2635,7 +2644,6 @@ function wireAntennaEvents(): void {
       heightM: toNumber(data.get('heightM')),
       azimuthDeg: toNumber(data.get('azimuthDeg')),
       tiltDeg: toNumber(data.get('tiltDeg')),
-      polarization: String(data.get('polarization')) as Polarization,
       pattern,
       patternParameters,
       gainOverrideDb: rawGain ? Number.parseFloat(rawGain) : undefined
@@ -3105,7 +3113,9 @@ function renderAntennaPatternPolarSvg(
   peakGainDbi: number,
   cutMode: 'azimuth' | 'elevation',
   fixedAngleDeg: number,
-  markerAngleDeg: number
+  markerAngleDeg: number,
+  boresightAzimuthDeg: number,
+  boresightTiltDeg: number
 ): string {
   const width = 360;
   const height = 360;
@@ -3117,7 +3127,15 @@ function renderAntennaPatternPolarSvg(
   const points = variableAngles.map((angleDeg) => {
     const azOffset = cutMode === 'azimuth' ? angleDeg : fixedAngleDeg;
     const elOffset = cutMode === 'azimuth' ? fixedAngleDeg : angleDeg;
-    const gainDb = antennaPatternGainDb(pattern, patternParameters, peakGainDbi, azOffset, elOffset);
+    const gainDb = antennaPatternGainDb(
+      pattern,
+      patternParameters,
+      peakGainDbi,
+      azOffset,
+      elOffset,
+      boresightAzimuthDeg,
+      boresightTiltDeg
+    );
     const normalized = Math.max(0, Math.min(1, (gainDb - minDb) / (peakGainDbi - minDb)));
     const r = normalized * radius;
     const theta = ((angleDeg - 90) * Math.PI) / 180;
@@ -3127,7 +3145,15 @@ function renderAntennaPatternPolarSvg(
   const subtitle = cutMode === 'azimuth' ? `Azimuth Cut at Elevation ${fixedAngleDeg.toFixed(1)}°` : `Elevation Cut at Azimuth ${fixedAngleDeg.toFixed(1)}°`;
   const markerAz = cutMode === 'azimuth' ? markerAngleDeg : fixedAngleDeg;
   const markerEl = cutMode === 'azimuth' ? fixedAngleDeg : markerAngleDeg;
-  const markerGainDb = antennaPatternGainDb(pattern, patternParameters, peakGainDbi, markerAz, markerEl);
+  const markerGainDb = antennaPatternGainDb(
+    pattern,
+    patternParameters,
+    peakGainDbi,
+    markerAz,
+    markerEl,
+    boresightAzimuthDeg,
+    boresightTiltDeg
+  );
   const markerNormalized = Math.max(0, Math.min(1, (markerGainDb - minDb) / (peakGainDbi - minDb)));
   const markerR = markerNormalized * radius;
   const markerTheta = ((markerAngleDeg - 90) * Math.PI) / 180;
@@ -3161,9 +3187,13 @@ function antennaPatternGainDb(
   pattern: AntennaPattern,
   patternParameters: Record<string, number>,
   peakGainDbi: number,
-  azimuthOffsetDeg: number,
-  elevationOffsetDeg: number
+  worldAzimuthDeg: number,
+  worldElevationDeg: number,
+  boresightAzimuthDeg: number,
+  boresightTiltDeg: number
 ): number {
+  const azimuthOffsetDeg = normalizedAngleDifferenceDeg(worldAzimuthDeg, boresightAzimuthDeg);
+  const elevationOffsetDeg = normalizedAngleDifferenceDeg(worldElevationDeg, boresightTiltDeg);
   const attenuationDb = antennaPatternAttenuationDb(pattern, patternParameters, azimuthOffsetDeg, elevationOffsetDeg);
   return peakGainDbi - attenuationDb;
 }
@@ -3207,6 +3237,14 @@ function antennaPatternAttenuationDb(
 function cosineSquaredAttenuationDb(angleDeg: number, exponent: number): number {
   const power = Math.max(Math.cos((angleDeg * Math.PI) / 180) ** Math.max(exponent, 0.1), 1e-6);
   return -10 * Math.log10(power);
+}
+
+function normalizedAngleDifferenceDeg(valueDeg: number, referenceDeg: number): number {
+  let diff = ((valueDeg - referenceDeg + 180) % 360) - 180;
+  if (diff < -180) {
+    diff += 360;
+  }
+  return diff;
 }
 
 function verticalMonopoleGroundPlaneAttenuationDb(angleDeg: number, exponent: number): number {

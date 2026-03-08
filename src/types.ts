@@ -22,8 +22,6 @@ export type AntennaPattern =
   | 'Horizontal Dipole'
   | 'Horn';
 
-export type Polarization = 'Vertical' | 'Horizontal' | 'Circular';
-
 export type PropagationModelType =
   | 'Free Space'
   | 'Two-Ray'
@@ -61,7 +59,6 @@ export interface AntennaModel {
   heightM: number;
   azimuthDeg: number;
   tiltDeg: number;
-  polarization: Polarization;
   pattern: AntennaPattern;
   patternParameters: Record<string, number>;
   gainOverrideDb?: number;
