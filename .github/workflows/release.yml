@@ -30,10 +30,6 @@ jobs:
           node-version: '20'
           cache: npm
 
-      - name: Generate license keypair
-        run: |
-          node scripts/generate-license-keypair.mjs scripts/keys
-
       - name: Build release zip
         run: scripts/build-release.sh "${GITHUB_REF_NAME#v}"
 
