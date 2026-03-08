@@ -1164,6 +1164,7 @@ function renderAntennasTab(): string {
             <input id="antenna-pattern-fixed-angle" type="range" min="${fixedAngleMin}" max="${fixedAngleMax}" step="1" value="${clampedFixedAngle}" />
           </label>
         </div>
+        <p id="antenna-pattern-error" class="field-error"></p>
         <p class="muted">Marker Readout: <strong id="antenna-pattern-marker-readout">${clampedMarkerAngle.toFixed(1)}°, ${markerGainDb.toFixed(2)} dBr</strong> (drag marker on plot)</p>
         <div class="antenna-visualization__plot">${previewSvg}</div>
       </aside>
@@ -2524,8 +2525,37 @@ function wireAntennaEvents(): void {
       return;
     }
     const selected = workspace.antennas.find((antenna) => antenna.id === selectedAntennaPreviewId);
-    const pattern = selected?.pattern ?? antennaPatternPreviewType;
-    const parameters = selected?.patternParameters ?? antennaPatternParameterDefaults[pattern];
+    const errorEl = document.querySelector<HTMLElement>('#antenna-pattern-error');
+    let pattern: AntennaPattern;
+    let parameters: Record<string, number>;
+    let errorMessage = '';
+
+    if (selected) {
+      pattern = selected.pattern;
+      parameters = selected.patternParameters ?? antennaPatternParameterDefaults[pattern];
+    } else {
+      const form = document.querySelector<HTMLFormElement>('#add-antenna-form');
+      const patternFromForm = form?.querySelector<HTMLSelectElement>('#antenna-pattern-form')?.value as AntennaPattern | undefined;
+      pattern = patternFromForm ?? antennaPatternPreviewType;
+      const defaults = antennaPatternParameterDefaults[pattern];
+      parameters = { ...defaults };
+      for (const key of Object.keys(defaults)) {
+        const input = form?.querySelector<HTMLInputElement>(`[data-antenna-param="${key}"]`);
+        const rawValue = input?.value?.trim() ?? '';
+        const parsed = Number.parseFloat(rawValue);
+        if (!rawValue || !Number.isFinite(parsed)) {
+          errorMessage = `Enter valid numeric values for ${prettyLabel(key)} to preview this pattern.`;
+        } else {
+          parameters[key] = parsed;
+        }
+      }
+    }
+
+    if (errorEl) {
+      errorEl.textContent = errorMessage;
+      errorEl.style.display = errorMessage ? 'block' : 'none';
+    }
+
     const fixedMin = antennaPatternCutMode === 'azimuth' ? -90 : -180;
     const fixedMax = antennaPatternCutMode === 'azimuth' ? 90 : 180;
     const markerMin = antennaPatternCutMode === 'azimuth' ? -180 : -90;
@@ -2618,6 +2648,17 @@ function wireAntennaEvents(): void {
     selectedAntennaPreviewId = '';
     render();
   });
+  form
+    ?.querySelectorAll<HTMLInputElement>('[data-antenna-param]')
+    .forEach((input) =>
+      input.addEventListener('input', () => {
+        if (selectedAntennaPreviewId) {
+          return;
+        }
+        updateAntennaPlot();
+        wireAntennaPlotDrag();
+      })
+    );
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);

@@ -766,3 +766,15 @@
 - Known Issues / Next Focus:
   - Optional future refinement: snap marker to configurable angular increments.
 - Commit: this commit (`milestone(M55): add draggable marker readout to antenna plot v0.56.0`)
+
+## M56 - Live Add-Pattern Preview + Validation Messaging
+- Date: 2026-03-07
+- Version: 0.57.0
+- Completed:
+  - Fixed visualization behavior for `Use Add Antenna Pattern` mode to use live draft values from the Add Antenna form.
+  - Added real-time updates while editing pattern parameter inputs (without needing to save antenna).
+  - Added inline validation error messaging in the visualization panel when draft pattern parameters are invalid/incomplete.
+  - Kept known-antenna mode behavior intact and isolated from draft-form validation messaging.
+- Known Issues / Next Focus:
+  - Optional future enhancement: highlight specific invalid fields in the Add Antenna panel in addition to summary error text.
+- Commit: this commit (`milestone(M56): live add-pattern preview and validation messaging v0.57.0`)
