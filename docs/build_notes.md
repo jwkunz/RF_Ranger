@@ -568,3 +568,14 @@
 - Known Issues / Next Focus:
   - Remote tile providers may have occasional availability/rate limits that affect map rendering.
 - Commit: this commit (`milestone(M41): guided capture and selectable basemap layers v0.42.0`)
+
+## M42 - Antenna Entry Labels
+- Date: 2026-03-07
+- Version: 0.43.0
+- Completed:
+  - Updated Antennas top entry panel to use explicit labels above each form field.
+  - Added units in labels where applicable (height, azimuth, tilt, gain override).
+  - Aligned Antennas form styling with label-based UI patterns used in other tabs.
+- Known Issues / Next Focus:
+  - None specific to this milestone.
+- Commit: this commit (`milestone(M42): antenna form labels v0.43.0`)

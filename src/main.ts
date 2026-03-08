@@ -885,24 +885,28 @@ function renderAntennasTab(): string {
     <section class="panel">
       <h3>Add Antenna</h3>
       <form id="add-antenna-form" class="grid-form">
-        <input name="name" placeholder="Name" required />
-        <input name="heightM" type="number" step="0.1" placeholder="Height (m)" required />
-        <input name="azimuthDeg" type="number" step="0.1" placeholder="Azimuth (deg)" required />
-        <input name="tiltDeg" type="number" step="0.1" placeholder="Tilt (deg)" required />
-        <select name="polarization">
-          <option>Vertical</option>
-          <option>Horizontal</option>
-          <option>Circular</option>
-        </select>
-        <select name="pattern">
-          <option>Omnidirectional</option>
-          <option>Vertical Dipole</option>
-          <option>Vertical Monopole</option>
-          <option>Horizontal Dipole</option>
-          <option>Horn</option>
-        </select>
-        <input name="gainOverrideDb" type="number" step="0.1" placeholder="Gain Override (optional)" />
-        <textarea name="comments" rows="2" placeholder="Antenna notes"></textarea>
+        <label>Name<input name="name" placeholder="Antenna name" required /></label>
+        <label>Height (m)<input name="heightM" type="number" step="0.1" required /></label>
+        <label>Azimuth (deg)<input name="azimuthDeg" type="number" step="0.1" required /></label>
+        <label>Tilt (deg)<input name="tiltDeg" type="number" step="0.1" required /></label>
+        <label>Polarization
+          <select name="polarization">
+            <option>Vertical</option>
+            <option>Horizontal</option>
+            <option>Circular</option>
+          </select>
+        </label>
+        <label>Pattern
+          <select name="pattern">
+            <option>Omnidirectional</option>
+            <option>Vertical Dipole</option>
+            <option>Vertical Monopole</option>
+            <option>Horizontal Dipole</option>
+            <option>Horn</option>
+          </select>
+        </label>
+        <label>Gain Override (dB, optional)<input name="gainOverrideDb" type="number" step="0.1" /></label>
+        <label>Comments<textarea name="comments" rows="2" placeholder="Antenna notes"></textarea></label>
         <button class="primary-btn" type="submit">Add Antenna</button>
       </form>
     </section>
