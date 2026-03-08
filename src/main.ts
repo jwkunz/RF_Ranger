@@ -14,14 +14,11 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { DEFAULT_WORKSPACE } from './defaults';
 import { exportReportsCsv, exportSitesKml, exportWorkspaceJson, parseSitesKml, parseWorkspaceJson } from './io';
-import { computeMachineFingerprint, validateLicense } from './license';
 import { loadWorkspace, saveWorkspace } from './storage';
 import type {
   AntennaModel,
   AntennaPatternPoint,
   AntennaPattern,
-  LicenseEnvelope,
-  LicenseValidationStatus,
   PropagationModel,
   PropagationModelType,
   RadioSink,
@@ -344,19 +341,6 @@ interface SimulationErrorMessage {
   message: string;
 }
 
-interface LicenseRuntimeState {
-  status: LicenseValidationStatus;
-  reason: string;
-  metadata: {
-    licensedTo: string;
-    licenseId: string;
-    issuedAt: string;
-    issuer: string;
-    keyId: string;
-    features: string[];
-  };
-}
-
 type SimulationWorkerMessage = SimulationProgressMessage | SimulationCompleteMessage | SimulationErrorMessage;
 
 let selectedTab: TabId = 'welcome';
@@ -395,19 +379,6 @@ let antennaPatternDraftPoints: AntennaPatternPoint[] = [];
 let selectedReportTreeIds = new Set<string>(
   REPORT_TREE.flatMap((category) => [category.id, ...category.fields.map((field) => field.id)])
 );
-let machineFingerprint = 'computing...';
-let licenseState: LicenseRuntimeState = {
-  status: 'missing',
-  reason: 'No license installed.',
-  metadata: {
-    licensedTo: 'Unlicensed',
-    licenseId: 'N/A',
-    issuedAt: 'N/A',
-    issuer: 'N/A',
-    keyId: 'N/A',
-    features: []
-  }
-};
 
 const app = requireAppRoot();
 
@@ -416,84 +387,9 @@ void init();
 async function init(): Promise<void> {
   workspace = await loadWorkspace();
   workspace = normalizeWorkspace(workspace);
-  try {
-    machineFingerprint = await computeMachineFingerprint();
-  } catch (_error) {
-    machineFingerprint = 'fingerprint-unavailable';
-  }
-  await refreshLicenseState();
   ensureSelectionDefaults();
   applyTheme();
   render();
-}
-
-async function refreshLicenseState(): Promise<void> {
-  const result = await validateLicense(workspace.license, machineFingerprint);
-  licenseState = {
-    status: result.status,
-    reason: result.reason,
-    metadata: result.metadata
-  };
-}
-
-function isReadOnlyMode(): boolean {
-  return licenseState.status !== 'valid';
-}
-
-function ensureWriteAccess(action: string): boolean {
-  if (!isReadOnlyMode()) {
-    return true;
-  }
-  alert(`Action blocked in read-only mode: ${action}. Reason: ${licenseState.reason}`);
-  return false;
-}
-
-function applyReadOnlyLocks(): void {
-  const selectors = [
-    '#add-site-coord',
-    '#update-site',
-    '#delete-selected-site',
-    '#save-site-view',
-    '#import-kml',
-    '[data-delete-site]',
-    '[data-delete-site-view]',
-    '#add-to-queue',
-    '#launch-simulations',
-    '[data-remove-sim]',
-    '[data-delete-result-run]',
-    '#clear-result-history',
-    '#clear-site-views',
-    '#add-source-form button[type="submit"]',
-    '#add-sink-form button[type="submit"]',
-    '[data-delete-source]',
-    '[data-delete-sink]',
-    '[data-edit-source]',
-    '[data-edit-sink]',
-    '#add-antenna-form button[type="submit"]',
-    '[data-delete-antenna]',
-    '[data-edit-antenna]',
-    '#antenna-pattern-csv',
-    '#add-prop-form button[type="submit"]',
-    '[data-delete-prop]',
-    '[data-edit-prop]',
-    '#import-json',
-    '#delete-radios',
-    '#delete-antennas',
-    '#delete-models',
-    '#delete-sites',
-    '#delete-simulations',
-    '#delete-results',
-    '#delete-everything'
-  ];
-  selectors.forEach((selector) => {
-    document.querySelectorAll<HTMLElement>(selector).forEach((element) => {
-      if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) {
-        element.disabled = true;
-      }
-      element.classList.add('readonly-locked');
-      element.title = 'Disabled in read-only mode';
-    });
-  });
 }
 
 function render(): void {
@@ -507,7 +403,6 @@ function render(): void {
   app.innerHTML = `
     <div class="shell">
       <header class="tabs">${tabButtons}</header>
-      ${isReadOnlyMode() ? `<div class="license-banner">Read-Only Mode: ${escapeHtml(licenseState.reason)}</div>` : ''}
       <main class="tab-content">${renderTabContent(selectedTab)}</main>
     </div>
   `;
@@ -520,9 +415,6 @@ function render(): void {
   });
 
   wireTabEvents();
-  if (isReadOnlyMode()) {
-    applyReadOnlyLocks();
-  }
 }
 
 function renderTabContent(tabId: TabId): string {
@@ -1290,8 +1182,6 @@ function renderPropagationTab(): string {
 }
 
 function renderPreferencesTab(): string {
-  const statusClass = licenseState.status === 'valid' ? 'license-status--valid' : 'license-status--invalid';
-  const statusLabel = licenseState.status === 'valid' ? 'Valid' : 'Read-Only';
   return `
     <h2>Preferences</h2>
     <div class="stack panel">
@@ -1316,26 +1206,6 @@ function renderPreferencesTab(): string {
           <option value="feet" ${workspace.preferences.distanceUnit === 'feet' ? 'selected' : ''}>feet</option>
         </select>
       </label>
-    </div>
-    <div class="stack panel">
-      <h3>License Management</h3>
-      <p class="license-status ${statusClass}">${statusLabel}: ${escapeHtml(licenseState.reason)}</p>
-      <label>Licensed To<input value="${escapeHtml(licenseState.metadata.licensedTo)}" readonly /></label>
-      <label>License ID<input value="${escapeHtml(licenseState.metadata.licenseId)}" readonly /></label>
-      <label>Issued At<input value="${escapeHtml(licenseState.metadata.issuedAt)}" readonly /></label>
-      <label>Issuer<input value="${escapeHtml(licenseState.metadata.issuer)}" readonly /></label>
-      <label>Key ID<input value="${escapeHtml(licenseState.metadata.keyId)}" readonly /></label>
-      <label>Machine Fingerprint
-        <input id="machine-fingerprint" value="${escapeHtml(machineFingerprint)}" readonly />
-      </label>
-      <div class="action-row">
-        <button id="copy-machine-fingerprint">Copy Fingerprint</button>
-        <label class="import-label">Install License
-          <input id="import-license" type="file" accept="application/json,.json,.license.json" />
-        </label>
-        <button id="remove-license">Remove License</button>
-      </div>
-      <p class="muted">Request a license by emailing <code>numerius.engineering@gmail.com</code> and including your machine fingerprint.</p>
     </div>
     <div class="stack panel">
       <h3>Data Management</h3>
@@ -1408,9 +1278,6 @@ function wireSitesEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('#delete-selected-site')?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Delete selected site')) {
-      return;
-    }
     if (!selectedSiteId) {
       return;
     }
@@ -1468,9 +1335,6 @@ function wireSitesEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('#save-site-view')?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Save site view')) {
-      return;
-    }
     const mapCanvas = document.querySelector<HTMLElement>('#map-canvas');
     if (!mapCanvas) {
       alert('Map unavailable. Open the Sites map before saving a site view.');
@@ -1531,10 +1395,6 @@ function wireSitesEvents(): void {
   });
 
   document.querySelector<HTMLInputElement>('#import-kml')?.addEventListener('change', async (event) => {
-    if (!ensureWriteAccess('Import KML')) {
-      (event.target as HTMLInputElement).value = '';
-      return;
-    }
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) {
       return;
@@ -1552,9 +1412,6 @@ function wireSitesEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-delete-site]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Delete site')) {
-        return;
-      }
       const id = button.dataset.deleteSite ?? '';
       workspace.sites = workspace.sites.filter((site) => site.id !== id);
       if (selectedSiteId === id) {
@@ -1583,9 +1440,6 @@ function wireSitesEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-delete-site-view]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Delete saved site view')) {
-        return;
-      }
       const id = button.dataset.deleteSiteView ?? '';
       workspace.savedSiteViews = workspace.savedSiteViews.filter((view) => view.id !== id);
       if (selectedSavedSiteViewId === id) {
@@ -1597,9 +1451,6 @@ function wireSitesEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('#clear-site-views')?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Clear saved site views')) {
-      return;
-    }
     workspace.savedSiteViews = [];
     selectedSavedSiteViewId = '';
     await saveWorkspace(workspace);
@@ -1646,9 +1497,6 @@ function wireSimulationEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-remove-queue]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Remove simulation queue item')) {
-        return;
-      }
       workspace.simulationQueue = workspace.simulationQueue.filter((item) => item.id !== button.dataset.removeQueue);
       await saveWorkspace(workspace);
       render();
@@ -1697,9 +1545,6 @@ function wireReportsEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-delete-result-run]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Delete result run')) {
-        return;
-      }
       const id = button.dataset.deleteResultRun ?? '';
       workspace.reportHistory = workspace.reportHistory.filter((run) => run.id !== id);
       visibleResultRunIds.delete(id);
@@ -1710,9 +1555,6 @@ function wireReportsEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('#clear-all-results')?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Clear results')) {
-      return;
-    }
     workspace.reportHistory = [];
     workspace.reportLatest = [];
     selectedResultRunId = '';
@@ -2176,9 +2018,6 @@ async function promptMapCaptureRegion(container: HTMLElement): Promise<CropRegio
 }
 
 async function addSimulationQueueItem(): Promise<void> {
-  if (!ensureWriteAccess('Add simulation queue item')) {
-    return;
-  }
   if (
     !selectedSimulationTxSiteId ||
     !selectedSimulationSourceRadioId ||
@@ -2210,9 +2049,6 @@ async function addSimulationQueueItem(): Promise<void> {
 }
 
 async function runSimulationQueue(): Promise<void> {
-  if (!ensureWriteAccess('Launch simulations')) {
-    return;
-  }
   const resolved = workspace.simulationQueue
     .map((item) => {
       const txSite = workspace.sites.find((site) => site.id === item.txSiteId);
@@ -2294,9 +2130,6 @@ async function runSimulationQueue(): Promise<void> {
 }
 
 async function addSiteFromForm(): Promise<void> {
-  if (!ensureWriteAccess('Add site')) {
-    return;
-  }
   const nameInput = document.querySelector<HTMLInputElement>('#site-name');
   const colorInput = document.querySelector<HTMLInputElement>('#site-color');
   const commentsInput = document.querySelector<HTMLTextAreaElement>('#site-comments');
@@ -2331,9 +2164,6 @@ async function addSiteFromForm(): Promise<void> {
 }
 
 async function updateSelectedSiteFromForm(): Promise<void> {
-  if (!ensureWriteAccess('Update site')) {
-    return;
-  }
   if (!selectedSiteId) {
     return;
   }
@@ -2547,9 +2377,6 @@ function wireRadiosEvents(): void {
   const sourceForm = document.querySelector<HTMLFormElement>('#add-source-form');
   sourceForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!ensureWriteAccess('Add source radio')) {
-      return;
-    }
     const data = new FormData(sourceForm);
     const source: RadioSource = {
       id: uid(),
@@ -2568,9 +2395,6 @@ function wireRadiosEvents(): void {
   const sinkForm = document.querySelector<HTMLFormElement>('#add-sink-form');
   sinkForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!ensureWriteAccess('Add sink radio')) {
-      return;
-    }
     const data = new FormData(sinkForm);
     const sink: RadioSink = {
       id: uid(),
@@ -2590,9 +2414,6 @@ function wireRadiosEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-delete-source]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Delete source radio')) {
-        return;
-      }
       const id = button.dataset.deleteSource;
       workspace.sources = workspace.sources.filter((source) => source.id !== id);
       await saveWorkspace(workspace);
@@ -2603,9 +2424,6 @@ function wireRadiosEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-delete-sink]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Delete sink radio')) {
-        return;
-      }
       const id = button.dataset.deleteSink;
       workspace.sinks = workspace.sinks.filter((sink) => sink.id !== id);
       await saveWorkspace(workspace);
@@ -2616,9 +2434,6 @@ function wireRadiosEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-edit-source]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Edit source radio')) {
-        return;
-      }
       const source = workspace.sources.find((entry) => entry.id === button.dataset.editSource);
       if (!source) {
         return;
@@ -2637,9 +2452,6 @@ function wireRadiosEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-edit-sink]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Edit sink radio')) {
-        return;
-      }
       const sink = workspace.sinks.find((entry) => entry.id === button.dataset.editSink);
       if (!sink) {
         return;
@@ -2855,10 +2667,6 @@ function wireAntennaEvents(): void {
   });
   const csvInput = form?.querySelector<HTMLInputElement>('#antenna-pattern-csv');
   csvInput?.addEventListener('change', async () => {
-    if (!ensureWriteAccess('Import custom antenna CSV')) {
-      csvInput.value = '';
-      return;
-    }
     const file = csvInput.files?.[0];
     if (!file) {
       antennaPatternDraftCsvName = '';
@@ -2896,9 +2704,6 @@ function wireAntennaEvents(): void {
     );
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!ensureWriteAccess('Add antenna')) {
-      return;
-    }
     const data = new FormData(form);
     const rawGain = String(data.get('gainOverrideDb') ?? '').trim();
     const pattern = String(data.get('pattern')) as AntennaPattern;
@@ -2933,9 +2738,6 @@ function wireAntennaEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-delete-antenna]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Delete antenna')) {
-        return;
-      }
       const id = button.dataset.deleteAntenna;
       workspace.antennas = workspace.antennas.filter((entry) => entry.id !== id);
       if (selectedAntennaPreviewId === id) {
@@ -2958,9 +2760,6 @@ function wireAntennaEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-edit-antenna]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Edit antenna')) {
-        return;
-      }
       const antenna = workspace.antennas.find((entry) => entry.id === button.dataset.editAntenna);
       if (!antenna) {
         return;
@@ -2990,9 +2789,6 @@ function wirePropagationEvents(): void {
   const form = document.querySelector<HTMLFormElement>('#add-prop-form');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!ensureWriteAccess('Add propagation model')) {
-      return;
-    }
     const data = new FormData(form);
     const modelTypeValue = String(data.get('modelType')) as PropagationModelType;
     const parameterEntries = Array.from(document.querySelectorAll<HTMLInputElement>('[data-prop-param]')).map((input) => [
@@ -3016,9 +2812,6 @@ function wirePropagationEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-delete-prop]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Delete propagation model')) {
-        return;
-      }
       const id = button.dataset.deleteProp;
       workspace.propagationModels = workspace.propagationModels.filter((entry) => entry.id !== id);
       ensureSelectionDefaults();
@@ -3029,9 +2822,6 @@ function wirePropagationEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-edit-prop]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!ensureWriteAccess('Edit propagation model')) {
-        return;
-      }
       const model = workspace.propagationModels.find((entry) => entry.id === button.dataset.editProp);
       if (!model) {
         return;
@@ -3062,9 +2852,6 @@ function wirePreferencesEvents(): void {
   const deleteSimulationsButton = document.querySelector<HTMLButtonElement>('#delete-simulations');
   const deleteResultsButton = document.querySelector<HTMLButtonElement>('#delete-results');
   const deleteEverythingButton = document.querySelector<HTMLButtonElement>('#delete-everything');
-  const copyFingerprintButton = document.querySelector<HTMLButtonElement>('#copy-machine-fingerprint');
-  const importLicenseInput = document.querySelector<HTMLInputElement>('#import-license');
-  const removeLicenseButton = document.querySelector<HTMLButtonElement>('#remove-license');
 
   theme?.addEventListener('change', async () => {
     workspace.preferences.theme = theme.value as WorkspaceSnapshot['preferences']['theme'];
@@ -3087,17 +2874,12 @@ function wirePreferencesEvents(): void {
   });
 
   importInput?.addEventListener('change', async () => {
-    if (!ensureWriteAccess('Import workspace JSON')) {
-      importInput.value = '';
-      return;
-    }
     const file = importInput.files?.[0];
     if (!file) {
       return;
     }
     try {
       workspace = normalizeWorkspace(await parseWorkspaceJson(file));
-      await refreshLicenseState();
       await saveWorkspace(workspace);
       applyTheme();
       ensureSelectionDefaults();
@@ -3105,44 +2887,6 @@ function wirePreferencesEvents(): void {
     } catch (error) {
       alert(`Import failed: ${String(error)}`);
     }
-  });
-
-  copyFingerprintButton?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(machineFingerprint);
-      alert('Machine fingerprint copied to clipboard.');
-    } catch (_error) {
-      alert('Could not copy machine fingerprint.');
-    }
-  });
-
-  importLicenseInput?.addEventListener('change', async () => {
-    const file = importLicenseInput.files?.[0];
-    if (!file) {
-      return;
-    }
-    try {
-      const raw = await file.text();
-      const parsed = JSON.parse(raw) as LicenseEnvelope;
-      workspace.license = parsed;
-      await refreshLicenseState();
-      await saveWorkspace(workspace);
-      render();
-    } catch (error) {
-      alert(`License import failed: ${String(error)}`);
-    } finally {
-      importLicenseInput.value = '';
-    }
-  });
-
-  removeLicenseButton?.addEventListener('click', async () => {
-    if (!confirm('Remove installed license?')) {
-      return;
-    }
-    delete workspace.license;
-    await refreshLicenseState();
-    await saveWorkspace(workspace);
-    render();
   });
 
   const performDelete = async (message: string, operation: () => void, { rerender = true }: { rerender?: boolean } = {}) => {
@@ -3158,9 +2902,6 @@ function wirePreferencesEvents(): void {
   };
 
   deleteRadiosButton?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Delete radios')) {
-      return;
-    }
     await performDelete('Delete all radios (sources and sinks)?', () => {
       workspace.sources = [];
       workspace.sinks = [];
@@ -3174,9 +2915,6 @@ function wirePreferencesEvents(): void {
   });
 
   deleteAntennasButton?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Delete antennas')) {
-      return;
-    }
     await performDelete('Delete all antennas?', () => {
       workspace.antennas = [];
       workspace.simulationQueue = [];
@@ -3189,9 +2927,6 @@ function wirePreferencesEvents(): void {
   });
 
   deleteModelsButton?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Delete propagation models')) {
-      return;
-    }
     await performDelete('Delete all propagation models?', () => {
       workspace.propagationModels = [];
       workspace.simulationQueue = [];
@@ -3204,9 +2939,6 @@ function wirePreferencesEvents(): void {
   });
 
   deleteSitesButton?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Delete sites')) {
-      return;
-    }
     await performDelete('Delete all sites?', () => {
       workspace.sites = [];
       selectedSiteId = '';
@@ -3221,9 +2953,6 @@ function wirePreferencesEvents(): void {
   });
 
   deleteSimulationsButton?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Delete simulations')) {
-      return;
-    }
     await performDelete('Delete all simulation queue entries?', () => {
       workspace.simulationQueue = [];
       focusedReportQueueItemId = '';
@@ -3231,9 +2960,6 @@ function wirePreferencesEvents(): void {
   });
 
   deleteResultsButton?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Delete results')) {
-      return;
-    }
     await performDelete('Delete all results (current table + history)?', () => {
       workspace.reportLatest = [];
       workspace.reportHistory = [];
@@ -3244,27 +2970,12 @@ function wirePreferencesEvents(): void {
   });
 
   deleteEverythingButton?.addEventListener('click', async () => {
-    if (!ensureWriteAccess('Delete everything')) {
-      return;
-    }
     await performDelete('Delete everything in workspace data? This will clear radios, antennas, models, sites, simulations, results, and saved site views.', () => {
       const prefs = { ...workspace.preferences };
       workspace = normalizeWorkspace({
         ...structuredClone(DEFAULT_WORKSPACE),
         preferences: prefs
       });
-      licenseState = {
-        status: 'missing',
-        reason: 'No license installed.',
-        metadata: {
-          licensedTo: 'Unlicensed',
-          licenseId: 'N/A',
-          issuedAt: 'N/A',
-          issuer: 'N/A',
-          keyId: 'N/A',
-          features: []
-        }
-      };
       selectedSiteId = '';
       selectedSimulationTxSiteId = '';
       selectedSimulationSourceRadioId = '';
@@ -3301,7 +3012,6 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     reportHistory?: Array<{ id?: string; createdAtIso?: string; rows?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }> }>;
     reportLatest?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }>;
     savedSiteViews?: Array<SavedSiteView & { id?: string; createdAtIso?: string; imageDataUrl?: string; fileName?: string }>;
-    license?: Partial<LicenseEnvelope>;
   };
 
   const preferences = {
@@ -3433,7 +3143,6 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
       imageDataUrl: view.imageDataUrl as string,
       fileName: view.fileName ?? defaultSiteViewFileName()
     }));
-  const normalizedLicense = normalizeLicenseEnvelope(work.license);
 
   return {
     schemaVersion: 1,
@@ -3446,44 +3155,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     preferences,
     reportLatest,
     reportHistory,
-    savedSiteViews,
-    license: normalizedLicense
-  };
-}
-
-function normalizeLicenseEnvelope(raw: Partial<LicenseEnvelope> | undefined): LicenseEnvelope | undefined {
-  if (!raw || typeof raw !== 'object') {
-    return undefined;
-  }
-  if (raw.alg !== 'Ed25519' || typeof raw.key_id !== 'string' || typeof raw.signature !== 'string' || !raw.payload) {
-    return undefined;
-  }
-  const payload = raw.payload as Partial<LicenseEnvelope['payload']>;
-  if (
-    typeof payload.license_id !== 'string' ||
-    typeof payload.licensed_user !== 'string' ||
-    typeof payload.licensed_org !== 'string' ||
-    typeof payload.machine_fingerprint !== 'string' ||
-    !Array.isArray(payload.features) ||
-    payload.features.some((feature) => typeof feature !== 'string') ||
-    typeof payload.issued_at !== 'string' ||
-    typeof payload.issuer !== 'string'
-  ) {
-    return undefined;
-  }
-  return {
-    alg: 'Ed25519',
-    key_id: raw.key_id,
-    signature: raw.signature,
-    payload: {
-      license_id: payload.license_id,
-      licensed_user: payload.licensed_user,
-      licensed_org: payload.licensed_org,
-      machine_fingerprint: payload.machine_fingerprint,
-      features: payload.features,
-      issued_at: payload.issued_at,
-      issuer: payload.issuer
-    }
+    savedSiteViews
   };
 }
 

@@ -14,12 +14,6 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-## Commercial License Access
-- Distribution model: customer receives a release ZIP and a separate signed license file.
-- A valid signed license file is required for full functionality. Without a valid license, the application runs in read-only mode.
-- To obtain or reissue a license, contact: `numerius.engineering@gmail.com`
-- License files are customer-specific and must not be redistributed outside the licensed organization.
-
 ## Runtime and Build Dependencies
 The dependency inventory below is generated from the current installed `node_modules` and package metadata (`package-lock.json` + package manifests).
 
