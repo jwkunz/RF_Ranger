@@ -197,25 +197,29 @@ A(\\Delta\\phi,\\Delta\\theta) = -10\\log_{10}\\left(\\max(P(\\Delta\\phi,\\Delt
 $$
 `,
   Horn: `
-## Horn (3D Gaussian-Like Main Lobe)
+## Rectangular Horn (3D Approximation)
 
-Approximate attenuation model:
+Peak gain is user-defined as $G_{peak}$ (dBi).
+
+Rectangular horn aperture dimensions:
+
+$$
+A = \\text{horn width},\\quad B = \\text{horn length}
+$$
+
+Approximate aperture-gain relation:
+
+$$
+G \\approx 10\\log_{10}\\left(\\eta\\frac{4\\pi AB}{\\lambda^2}\\right)
+$$
+
+Pattern attenuation approximation:
 
 $$
 A(\\Delta\\phi,\\Delta\\theta)=12\\left(\\frac{|\\Delta\\phi|}{\\phi_{3dB}}\\right)^2 + 12\\left(\\frac{|\\Delta\\theta|}{\\theta_{3dB}}\\right)^2
 $$
 
-With:
-
-$$
-\\phi_{3dB}=30^\\circ,\\quad \\theta_{3dB}=30^\\circ
-$$
-
-And bounded:
-
-$$
-A \\le 40\\,\\mathrm{dB}
-$$
+with beamwidths inferred from aperture size.
 `
 };
 
@@ -224,7 +228,7 @@ const antennaPatternParameterDefaults: Record<AntennaPattern, Record<string, num
   'Vertical Dipole': { directivityExponent: 2 },
   'Vertical Monopole': { directivityExponent: 2 },
   'Horizontal Dipole': { azimuthExponent: 2, elevationExponent: 2 },
-  Horn: { az3dBBwDeg: 30, el3dBBwDeg: 30 }
+  Horn: { hornWidthA: 0.25, hornLengthB: 0.2 }
 };
 
 const antennaPatternParameterMeta: Record<AntennaPattern, Record<string, { label: string; units?: string; symbol: string; description: string }>> = {
@@ -256,17 +260,17 @@ const antennaPatternParameterMeta: Record<AntennaPattern, Record<string, { label
     }
   },
   Horn: {
-    az3dBBwDeg: {
-      label: 'Azimuth 3 dB Beamwidth',
-      units: 'deg',
-      symbol: '\\phi_{3dB}',
-      description: 'Half-power beamwidth in azimuth.'
+    hornWidthA: {
+      label: 'Horn Width A',
+      units: 'm',
+      symbol: 'A',
+      description: 'Rectangular horn aperture width.'
     },
-    el3dBBwDeg: {
-      label: 'Elevation 3 dB Beamwidth',
-      units: 'deg',
-      symbol: '\\theta_{3dB}',
-      description: 'Half-power beamwidth in elevation.'
+    hornLengthB: {
+      label: 'Horn Length B',
+      units: 'm',
+      symbol: 'B',
+      description: 'Rectangular horn aperture length.'
     }
   }
 };
@@ -353,7 +357,7 @@ const REPORT_TREE: ReportTreeCategory[] = [
       { id: 'txAntennaTilt', label: 'Tilt (deg)' },
       { id: 'txAntennaPolarization', label: 'Polarization' },
       { id: 'txAntennaPattern', label: 'Pattern' },
-      { id: 'txAntennaGain', label: 'Gain Override (dB)' }
+      { id: 'txAntennaGain', label: 'Peak Gain (dBi)' }
     ]
   },
   {
@@ -390,7 +394,7 @@ const REPORT_TREE: ReportTreeCategory[] = [
       { id: 'rxAntennaTilt', label: 'Tilt (deg)' },
       { id: 'rxAntennaPolarization', label: 'Polarization' },
       { id: 'rxAntennaPattern', label: 'Pattern' },
-      { id: 'rxAntennaGain', label: 'Gain Override (dB)' }
+      { id: 'rxAntennaGain', label: 'Peak Gain (dBi)' }
     ]
   }
 ];
@@ -1071,10 +1075,13 @@ function renderAntennasTab(): string {
   const markerMax = antennaPatternCutMode === 'azimuth' ? 180 : 90;
   const clampedMarkerAngle = Math.max(markerMin, Math.min(markerMax, antennaPatternMarkerAngleDeg));
   const previewPatternOptions = patternOptions
-    .map((pattern) => `<option value="${pattern}" ${pattern === antennaPatternPreviewType ? 'selected' : ''}>${pattern}</option>`)
+    .map((pattern) => `<option value="${pattern}" ${pattern === antennaPatternPreviewType ? 'selected' : ''}>${escapeHtml(antennaPatternDisplayName(pattern))}</option>`)
     .join('');
   const previewAntennaOptions = workspace.antennas
-    .map((antenna) => `<option value="${antenna.id}" ${previewAntenna?.id === antenna.id ? 'selected' : ''}>${escapeHtml(antenna.name)} (${antenna.pattern})</option>`)
+    .map(
+      (antenna) =>
+        `<option value="${antenna.id}" ${previewAntenna?.id === antenna.id ? 'selected' : ''}>${escapeHtml(antenna.name)} (${escapeHtml(antennaPatternDisplayName(antenna.pattern))})</option>`
+    )
     .join('');
   const parameterInputs = Object.entries(antennaPatternParameterDefaults[antennaPatternPreviewType])
     .map(([key, defaultValue]) => {
@@ -1109,9 +1116,9 @@ function renderAntennasTab(): string {
         <td>${antenna.azimuthDeg}</td>
         <td>${antenna.tiltDeg}</td>
         <td>${antenna.polarization}</td>
-        <td>${antenna.pattern}</td>
+        <td>${escapeHtml(antennaPatternDisplayName(antenna.pattern))}</td>
         <td><code>${escapeHtml(JSON.stringify(antenna.patternParameters))}</code></td>
-        <td>${antenna.gainOverrideDb ?? 'default'}</td>
+        <td>${(antenna.gainOverrideDb ?? defaultPeakGainDbiForPattern(antenna.pattern)).toFixed(2)}</td>
         <td>${escapeHtml(antenna.comments || '')}</td>
         <td><button data-edit-antenna="${antenna.id}">Edit</button> <button data-delete-antenna="${antenna.id}">Delete</button></td>
       </tr>`
@@ -1142,7 +1149,7 @@ function renderAntennasTab(): string {
             <legend>Pattern Parameters</legend>
             ${parameterInputs || '<p class="muted">No additional parameters for this pattern.</p>'}
           </fieldset>
-          <label>Gain Override (dB, optional)<input name="gainOverrideDb" type="number" step="0.1" /></label>
+          <label>Peak Gain (dBi)<input name="gainOverrideDb" type="number" step="0.1" value="${defaultPeakGainDbiForPattern(antennaPatternPreviewType).toFixed(2)}" /></label>
           <label>Comments<textarea name="comments" rows="2" placeholder="Antenna notes"></textarea></label>
           <button class="primary-btn" type="submit">Add Antenna</button>
         </form>
@@ -1175,7 +1182,7 @@ function renderAntennasTab(): string {
     <section class="panel">
       <h3>Known Antennas</h3>
       <table>
-        <thead><tr><th>Name</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Pattern Parameters</th><th>Gain</th><th>Comments</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Pattern Parameters</th><th>Peak Gain (dBi)</th><th>Comments</th><th>Actions</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="10">No antennas yet.</td></tr>'}</tbody>
       </table>
     </section>
@@ -1828,7 +1835,8 @@ async function generatePdfReport(): Promise<void> {
           if (selectedReportTreeIds.has('txAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
           if (selectedReportTreeIds.has('txAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
           if (selectedReportTreeIds.has('txAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
-          if (selectedReportTreeIds.has('txAntennaGain')) lines.push(`Gain Override: ${antenna.gainOverrideDb ?? 'default'}`);
+          if (selectedReportTreeIds.has('txAntennaGain'))
+            lines.push(`Peak Gain: ${(antenna.gainOverrideDb ?? defaultPeakGainDbiForPattern(antenna.pattern)).toFixed(2)} dBi`);
           lines.forEach((line) => writeWrapped(`- ${line}`));
         });
       }
@@ -1884,7 +1892,8 @@ async function generatePdfReport(): Promise<void> {
           if (selectedReportTreeIds.has('rxAntennaTilt')) lines.push(`Tilt: ${antenna.tiltDeg} deg`);
           if (selectedReportTreeIds.has('rxAntennaPolarization')) lines.push(`Polarization: ${antenna.polarization}`);
           if (selectedReportTreeIds.has('rxAntennaPattern')) lines.push(`Pattern: ${antenna.pattern}`);
-          if (selectedReportTreeIds.has('rxAntennaGain')) lines.push(`Gain Override: ${antenna.gainOverrideDb ?? 'default'}`);
+          if (selectedReportTreeIds.has('rxAntennaGain'))
+            lines.push(`Peak Gain: ${(antenna.gainOverrideDb ?? defaultPeakGainDbiForPattern(antenna.pattern)).toFixed(2)} dBi`);
           lines.forEach((line) => writeWrapped(`- ${line}`));
         });
       }
@@ -3249,8 +3258,13 @@ function antennaPatternAttenuationDb(
       return -10 * Math.log10(Math.max(azPower * elPower, 1e-6));
     }
     case 'Horn': {
-      const az3Db = patternParameters.az3dBBwDeg ?? 30;
-      const el3Db = patternParameters.el3dBBwDeg ?? 30;
+      // Visualization uses a fixed reference frequency for beamwidth estimation.
+      const referenceFrequencyMHz = 2400;
+      const lambdaM = 300 / referenceFrequencyMHz;
+      const hornWidthA = Math.max(patternParameters.hornWidthA ?? 0.25, 0.001);
+      const hornLengthB = Math.max(patternParameters.hornLengthB ?? 0.2, 0.001);
+      const az3Db = Math.max(50.6 * lambdaM / hornWidthA, 1);
+      const el3Db = Math.max(50.6 * lambdaM / hornLengthB, 1);
       const attenuation = 12 * (absAz / az3Db) ** 2 + 12 * (absEl / el3Db) ** 2;
       return Math.min(attenuation, 40);
     }
@@ -3407,6 +3421,29 @@ function prettyLabel(value: string): string {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (s) => s.toUpperCase())
     .trim();
+}
+
+function antennaPatternDisplayName(pattern: AntennaPattern): string {
+  if (pattern === 'Horn') {
+    return 'Rectangular Horn';
+  }
+  return pattern;
+}
+
+function defaultPeakGainDbiForPattern(pattern: AntennaPattern): number {
+  switch (pattern) {
+    case 'Omnidirectional':
+      return 0;
+    case 'Vertical Dipole':
+    case 'Horizontal Dipole':
+      return 1.6;
+    case 'Vertical Monopole':
+      return 0;
+    case 'Horn':
+      return 10;
+    default:
+      return 0;
+  }
 }
 
 function normalizeAntennaPatternParameters(pattern: AntennaPattern, raw?: Record<string, number>): Record<string, number> {

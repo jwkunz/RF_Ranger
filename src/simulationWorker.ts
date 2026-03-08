@@ -77,8 +77,8 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
       const rxAzimuthOffsetDeg = normalizedAngleDifferenceDeg(rxToTxBearingDeg, item.rxAntenna.azimuthDeg);
       const rxElevationOffsetDeg = normalizedAngleDifferenceDeg(rxToTxElevationDeg, item.rxAntenna.tiltDeg);
 
-      const txGainDb = directionalAntennaGainDb(item.txAntenna, txToRxBearingDeg, txToRxElevationDeg);
-      const rxGainDb = directionalAntennaGainDb(item.rxAntenna, rxToTxBearingDeg, rxToTxElevationDeg);
+      const txGainDb = directionalAntennaGainDb(item.txAntenna, txToRxBearingDeg, txToRxElevationDeg, frequencyMHz);
+      const rxGainDb = directionalAntennaGainDb(item.rxAntenna, rxToTxBearingDeg, rxToTxElevationDeg, frequencyMHz);
       const transmitterEirpDbm = item.sourceRadio.txPowerDbm + txGainDb;
       const txPowerDensityDbmPerHz = item.sourceRadio.txPowerDbm - 10 * Math.log10(Math.max(item.sourceRadio.bandwidthHz, 1));
       const transmitterEirpDensityDbmPerHz = txPowerDensityDbmPerHz + txGainDb;
@@ -231,12 +231,13 @@ function directionalAntennaGainDb(
     tiltDeg: number;
   },
   targetBearingDeg: number,
-  targetElevationDeg: number
+  targetElevationDeg: number,
+  frequencyMHz: number
 ): number {
   const boresightGainDb = antennaBaseGainDb(antenna.pattern, antenna.gainOverrideDb);
   const azOffsetDeg = normalizedAngleDifferenceDeg(targetBearingDeg, antenna.azimuthDeg);
   const elOffsetDeg = normalizedAngleDifferenceDeg(targetElevationDeg, antenna.tiltDeg);
-  const attenuationDb = antennaPatternAttenuationDb(antenna.pattern, antenna.patternParameters, azOffsetDeg, elOffsetDeg);
+  const attenuationDb = antennaPatternAttenuationDb(antenna.pattern, antenna.patternParameters, azOffsetDeg, elOffsetDeg, frequencyMHz);
   return boresightGainDb - attenuationDb;
 }
 
@@ -246,15 +247,15 @@ function antennaBaseGainDb(pattern: AntennaPattern, gainOverrideDb?: number): nu
   }
   switch (pattern) {
     case 'Omnidirectional':
-      return 2.15;
+      return 0;
     case 'Vertical Dipole':
-      return 2.15;
+      return 1.6;
     case 'Vertical Monopole':
-      return 5.15;
+      return 0;
     case 'Horizontal Dipole':
-      return 2.15;
+      return 1.6;
     case 'Horn':
-      return 15;
+      return 10;
     default:
       return 0;
   }
@@ -264,7 +265,8 @@ function antennaPatternAttenuationDb(
   pattern: AntennaPattern,
   patternParameters: Record<string, number>,
   azOffsetDeg: number,
-  elOffsetDeg: number
+  elOffsetDeg: number,
+  frequencyMHz: number
 ): number {
   const absAz = Math.abs(azOffsetDeg);
   const absEl = Math.abs(elOffsetDeg);
@@ -279,7 +281,13 @@ function antennaPatternAttenuationDb(
     case 'Horizontal Dipole':
       return horizontalDipoleAttenuationDb(azOffsetDeg, elOffsetDeg, patternParameters.azimuthExponent ?? 2, patternParameters.elevationExponent ?? 2);
     case 'Horn':
-      return hornAttenuationDb(absAz, absEl, patternParameters.az3dBBwDeg ?? 30, patternParameters.el3dBBwDeg ?? 30);
+      return rectangularHornAttenuationDb(
+        absAz,
+        absEl,
+        patternParameters.hornWidthA ?? 0.25,
+        patternParameters.hornLengthB ?? 0.2,
+        frequencyMHz
+      );
     default:
       return 0;
   }
@@ -310,8 +318,17 @@ function horizontalDipoleAttenuationDb(
   return -10 * Math.log10(power);
 }
 
-function hornAttenuationDb(absAzOffsetDeg: number, absElOffsetDeg: number, az3DbBwDeg: number, el3DbBwDeg: number): number {
-  // Gaussian-like main lobe with conservative side-lobe floor.
+function rectangularHornAttenuationDb(
+  absAzOffsetDeg: number,
+  absElOffsetDeg: number,
+  hornWidthAM: number,
+  hornLengthBM: number,
+  frequencyMHz: number
+): number {
+  // Beamwidth approximation from rectangular aperture dimensions and wavelength.
+  const lambdaM = 300 / Math.max(frequencyMHz, 0.001);
+  const az3DbBwDeg = Math.max(50.6 * lambdaM / Math.max(hornWidthAM, 0.001), 1);
+  const el3DbBwDeg = Math.max(50.6 * lambdaM / Math.max(hornLengthBM, 0.001), 1);
   const attenuation =
     12 * (absAzOffsetDeg / Math.max(az3DbBwDeg, 0.1)) ** 2 + 12 * (absElOffsetDeg / Math.max(el3DbBwDeg, 0.1)) ** 2;
   return Math.min(attenuation, 40);

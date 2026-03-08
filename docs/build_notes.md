@@ -790,3 +790,23 @@
 - Known Issues / Next Focus:
   - Optional: expose configurable angle-step size for marker slider and drag snapping.
 - Commit: this commit (`milestone(M57): add marker angle linear slider control v0.58.0`)
+
+## M58 - Peak Gain Semantics + Rectangular Horn Parameterization
+- Date: 2026-03-07
+- Version: 0.59.0
+- Completed:
+  - Reframed antenna gain model so each pattern is treated relative to a peak gain.
+  - Renamed antenna gain input label to `Peak Gain (dBi)` and updated corresponding table/report wording.
+  - Updated default peak gains:
+    - Omnidirectional: `0 dBi`
+    - Vertical Dipole: `1.6 dBi`
+    - Horizontal Dipole: `1.6 dBi`
+  - Updated Horn display naming to `Rectangular Horn`.
+  - Replaced horn beamwidth parameters with geometric parameters:
+    - `Horn Width A`
+    - `Horn Length B`
+  - Updated documentation/equation panel content for rectangular horn governing equations.
+  - Updated simulation worker rectangular-horn attenuation to derive beamwidth from `A`, `B`, and operating frequency.
+- Known Issues / Next Focus:
+  - Optional refinement: expose rectangular horn efficiency factor in UI for direct aperture-gain tuning.
+- Commit: this commit (`milestone(M58): peak gain semantics and rectangular horn parameters v0.59.0`)
