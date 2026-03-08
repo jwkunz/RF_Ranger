@@ -110,6 +110,12 @@ export interface SimulationResultRow {
   sourceName: string;
   sinkName: string;
   simulationComments: string;
+  txAzimuthOffsetDeg: number;
+  txElevationOffsetDeg: number;
+  rxAzimuthOffsetDeg: number;
+  rxElevationOffsetDeg: number;
+  txEffectiveGainDb: number;
+  rxEffectiveGainDb: number;
   transmitterEirpDbm: number;
   transmitterEirpDensityDbmPerHz: number;
   distanceKm: number;

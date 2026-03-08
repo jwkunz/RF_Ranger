@@ -58,6 +58,11 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
       );
       const totalPathLossDb = baseFsplDb + extraLossDb;
 
+      const txAzimuthOffsetDeg = normalizedAngleDifferenceDeg(txToRxBearingDeg, item.txAntenna.azimuthDeg);
+      const txElevationOffsetDeg = normalizedAngleDifferenceDeg(txToRxElevationDeg, item.txAntenna.tiltDeg);
+      const rxAzimuthOffsetDeg = normalizedAngleDifferenceDeg(rxToTxBearingDeg, item.rxAntenna.azimuthDeg);
+      const rxElevationOffsetDeg = normalizedAngleDifferenceDeg(rxToTxElevationDeg, item.rxAntenna.tiltDeg);
+
       const txGainDb = directionalAntennaGainDb(item.txAntenna, txToRxBearingDeg, txToRxElevationDeg);
       const rxGainDb = directionalAntennaGainDb(item.rxAntenna, rxToTxBearingDeg, rxToTxElevationDeg);
       const transmitterEirpDbm = item.sourceRadio.txPowerDbm + txGainDb;
@@ -99,6 +104,12 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
         sourceName: `${item.txSite.name} / ${item.sourceRadio.name}`,
         sinkName: `${item.rxSite.name} / ${item.receiverRadio.name}`,
         simulationComments: item.comments ?? '',
+        txAzimuthOffsetDeg,
+        txElevationOffsetDeg,
+        rxAzimuthOffsetDeg,
+        rxElevationOffsetDeg,
+        txEffectiveGainDb: txGainDb,
+        rxEffectiveGainDb: rxGainDb,
         transmitterEirpDbm,
         transmitterEirpDensityDbmPerHz,
         distanceKm,

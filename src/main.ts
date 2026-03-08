@@ -231,6 +231,12 @@ const RESULT_FIELD_OPTIONS: Array<{ id: string; label: string; value: (row: Simu
   { id: 'receiverCoordinates', label: 'Receiver Coordinates', value: (row) => row.receiverCoordinates },
   { id: 'receiverRadio', label: 'Receiver Radio', value: (row) => row.receiverRadio },
   { id: 'simulationComments', label: 'Simulation Comments', value: (row) => row.simulationComments || '' },
+  { id: 'txAzimuthOffset', label: 'TX Azimuth Offset (deg)', value: (row) => row.txAzimuthOffsetDeg.toFixed(2) },
+  { id: 'txElevationOffset', label: 'TX Elevation Offset (deg)', value: (row) => row.txElevationOffsetDeg.toFixed(2) },
+  { id: 'rxAzimuthOffset', label: 'RX Azimuth Offset (deg)', value: (row) => row.rxAzimuthOffsetDeg.toFixed(2) },
+  { id: 'rxElevationOffset', label: 'RX Elevation Offset (deg)', value: (row) => row.rxElevationOffsetDeg.toFixed(2) },
+  { id: 'txEffectiveGain', label: 'TX Effective Gain (dB)', value: (row) => row.txEffectiveGainDb.toFixed(2) },
+  { id: 'rxEffectiveGain', label: 'RX Effective Gain (dB)', value: (row) => row.rxEffectiveGainDb.toFixed(2) },
   { id: 'transmitterEirp', label: 'Transmitter EIRP', value: (row) => formatPower(row.transmitterEirpDbm) },
   { id: 'transmitterEirpDensity', label: 'Transmitter EIRP Density', value: (row) => formatPowerDensity(row.transmitterEirpDensityDbmPerHz) },
   { id: 'distance', label: 'Distance', value: (row) => formatDistance(row.distanceKm) },
@@ -729,6 +735,12 @@ function renderReportsTab(): string {
         <td>${escapeHtml(row.receiverSiteName)}</td>
         <td>${escapeHtml(row.receiverCoordinates)}</td>
         <td>${escapeHtml(row.receiverRadio)}</td>
+        <td>${row.txAzimuthOffsetDeg.toFixed(2)}</td>
+        <td>${row.txElevationOffsetDeg.toFixed(2)}</td>
+        <td>${row.rxAzimuthOffsetDeg.toFixed(2)}</td>
+        <td>${row.rxElevationOffsetDeg.toFixed(2)}</td>
+        <td>${row.txEffectiveGainDb.toFixed(2)}</td>
+        <td>${row.rxEffectiveGainDb.toFixed(2)}</td>
         <td>${formatPowerNumeric(row.transmitterEirpDbm)}</td>
         <td>${formatPowerDensityNumeric(row.transmitterEirpDensityDbmPerHz)}</td>
         <td>${formatDistanceNumeric(row.distanceKm)}</td>
@@ -780,6 +792,12 @@ function renderReportsTab(): string {
             <th>${h(['Receiver', 'Site Name'])}</th>
             <th>${h(['Receiver', 'Coordinates'])}</th>
             <th>${h(['Receiver', 'Radio'])}</th>
+            <th>${h(['TX Azimuth', 'Offset'], 'deg')}</th>
+            <th>${h(['TX Elevation', 'Offset'], 'deg')}</th>
+            <th>${h(['RX Azimuth', 'Offset'], 'deg')}</th>
+            <th>${h(['RX Elevation', 'Offset'], 'deg')}</th>
+            <th>${h(['TX Effective', 'Gain'], 'dB')}</th>
+            <th>${h(['RX Effective', 'Gain'], 'dB')}</th>
             <th>${h(['Transmitter', 'EIRP'], powerUnit)}</th>
             <th>${h(['Transmitter EIRP', 'Density'], powerDensityUnit)}</th>
             <th>${h(['Distance'], distanceUnit)}</th>
@@ -794,7 +812,7 @@ function renderReportsTab(): string {
             <th>${h(['Jump'])}</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="21">No visible result data. Check runs in the queue below.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="27">No visible result data. Check runs in the queue below.</td></tr>'}</tbody>
       </table>
     </section>
     <section class="panel">
@@ -2656,6 +2674,12 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     sourceName: row.sourceName ?? 'Unknown Source',
     sinkName: row.sinkName ?? 'Unknown Sink',
     simulationComments: row.simulationComments ?? '',
+    txAzimuthOffsetDeg: row.txAzimuthOffsetDeg ?? 0,
+    txElevationOffsetDeg: row.txElevationOffsetDeg ?? 0,
+    rxAzimuthOffsetDeg: row.rxAzimuthOffsetDeg ?? 0,
+    rxElevationOffsetDeg: row.rxElevationOffsetDeg ?? 0,
+    txEffectiveGainDb: row.txEffectiveGainDb ?? 0,
+    rxEffectiveGainDb: row.rxEffectiveGainDb ?? 0,
     transmitterEirpDbm: row.transmitterEirpDbm ?? 0,
     transmitterEirpDensityDbmPerHz: row.transmitterEirpDensityDbmPerHz ?? 0,
     distanceKm: row.distanceKm ?? 0,

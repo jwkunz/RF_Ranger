@@ -688,3 +688,22 @@
 - Known Issues / Next Focus:
   - Results/report fields for directional offsets and effective gains are not yet exposed; planned for next milestone.
 - Commit: this commit (`milestone(M50): antenna pattern visualization and docs panel v0.51.0`)
+
+## M51 - Directional Geometry/Gain Result Field Exposure
+- Date: 2026-03-07
+- Version: 0.52.0
+- Completed:
+  - Added directional antenna geometry/gain outputs to simulation result model:
+    - TX azimuth offset
+    - TX elevation offset
+    - RX azimuth offset
+    - RX elevation offset
+    - TX effective gain
+    - RX effective gain
+  - Populated these fields in the simulation worker from the 3D directional math pipeline.
+  - Added these fields into the Results table.
+  - Added these fields into CSV export output.
+  - Added normalization defaults for backward compatibility when loading older saved workspaces.
+- Known Issues / Next Focus:
+  - Optional future refinement: allow user toggling visibility of advanced directional columns in Results.
+- Commit: this commit (`milestone(M51): expose directional offsets and effective gains v0.52.0`)
