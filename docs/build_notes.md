@@ -878,3 +878,23 @@
 - Known Issues / Next Focus:
   - Optional enhancement: let users choose export resolution and coordinate frame.
 - Commit: this commit (`milestone(M63): add antenna pattern CSV export action v0.64.0`)
+
+## M64 - Preferences Data Management Panel + Bulk Deletes
+- Date: 2026-03-07
+- Version: 0.65.0
+- Completed:
+  - Added a dedicated `Data Management` panel in Preferences.
+  - Moved Workspace JSON export/import controls into `Data Management`.
+  - Added bulk delete actions:
+    - `Delete Radios`
+    - `Delete Antennas`
+    - `Delete Models`
+    - `Delete Sites`
+    - `Delete Simulations`
+    - `Delete Results`
+    - `Delete Everything`
+  - Added confirmation prompts and state cleanup for dependent selections/results where relevant.
+  - `Delete Everything` now clears all workspace data while preserving current preference settings.
+- Known Issues / Next Focus:
+  - Optional enhancement: add per-action undo/restore guardrails beyond JSON backup.
+- Commit: this commit (`milestone(M64): add preferences data management and bulk delete actions v0.65.0`)

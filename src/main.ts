@@ -1185,6 +1185,7 @@ function renderPreferencesTab(): string {
   return `
     <h2>Preferences</h2>
     <div class="stack panel">
+      <h3>Interface</h3>
       <label>Theme
         <select id="pref-theme">
           <option value="light" ${workspace.preferences.theme === 'light' ? 'selected' : ''}>Light</option>
@@ -1205,9 +1206,23 @@ function renderPreferencesTab(): string {
           <option value="feet" ${workspace.preferences.distanceUnit === 'feet' ? 'selected' : ''}>feet</option>
         </select>
       </label>
+    </div>
+    <div class="stack panel">
+      <h3>Data Management</h3>
       <div class="action-row">
         <button id="export-json" class="primary-btn">Export Workspace JSON</button>
         <label class="import-label">Import Workspace JSON<input id="import-json" type="file" accept="application/json,.json" /></label>
+      </div>
+      <div class="action-row">
+        <button id="delete-radios">Delete Radios</button>
+        <button id="delete-antennas">Delete Antennas</button>
+        <button id="delete-models">Delete Models</button>
+        <button id="delete-sites">Delete Sites</button>
+      </div>
+      <div class="action-row">
+        <button id="delete-simulations">Delete Simulations</button>
+        <button id="delete-results">Delete Results</button>
+        <button id="delete-everything">Delete Everything</button>
       </div>
     </div>
   `;
@@ -2830,6 +2845,13 @@ function wirePreferencesEvents(): void {
   const distanceUnit = document.querySelector<HTMLSelectElement>('#pref-distance-unit');
   const exportButton = document.querySelector<HTMLButtonElement>('#export-json');
   const importInput = document.querySelector<HTMLInputElement>('#import-json');
+  const deleteRadiosButton = document.querySelector<HTMLButtonElement>('#delete-radios');
+  const deleteAntennasButton = document.querySelector<HTMLButtonElement>('#delete-antennas');
+  const deleteModelsButton = document.querySelector<HTMLButtonElement>('#delete-models');
+  const deleteSitesButton = document.querySelector<HTMLButtonElement>('#delete-sites');
+  const deleteSimulationsButton = document.querySelector<HTMLButtonElement>('#delete-simulations');
+  const deleteResultsButton = document.querySelector<HTMLButtonElement>('#delete-results');
+  const deleteEverythingButton = document.querySelector<HTMLButtonElement>('#delete-everything');
 
   theme?.addEventListener('change', async () => {
     workspace.preferences.theme = theme.value as WorkspaceSnapshot['preferences']['theme'];
@@ -2865,6 +2887,108 @@ function wirePreferencesEvents(): void {
     } catch (error) {
       alert(`Import failed: ${String(error)}`);
     }
+  });
+
+  const performDelete = async (message: string, operation: () => void, { rerender = true }: { rerender?: boolean } = {}) => {
+    if (!confirm(message)) {
+      return;
+    }
+    operation();
+    ensureSelectionDefaults();
+    await saveWorkspace(workspace);
+    if (rerender) {
+      render();
+    }
+  };
+
+  deleteRadiosButton?.addEventListener('click', async () => {
+    await performDelete('Delete all radios (sources and sinks)?', () => {
+      workspace.sources = [];
+      workspace.sinks = [];
+      workspace.simulationQueue = [];
+      workspace.reportLatest = [];
+      workspace.reportHistory = [];
+      visibleResultRunIds.clear();
+      selectedResultRunId = '';
+      focusedReportQueueItemId = '';
+    });
+  });
+
+  deleteAntennasButton?.addEventListener('click', async () => {
+    await performDelete('Delete all antennas?', () => {
+      workspace.antennas = [];
+      workspace.simulationQueue = [];
+      workspace.reportLatest = [];
+      workspace.reportHistory = [];
+      visibleResultRunIds.clear();
+      selectedResultRunId = '';
+      focusedReportQueueItemId = '';
+    });
+  });
+
+  deleteModelsButton?.addEventListener('click', async () => {
+    await performDelete('Delete all propagation models?', () => {
+      workspace.propagationModels = [];
+      workspace.simulationQueue = [];
+      workspace.reportLatest = [];
+      workspace.reportHistory = [];
+      visibleResultRunIds.clear();
+      selectedResultRunId = '';
+      focusedReportQueueItemId = '';
+    });
+  });
+
+  deleteSitesButton?.addEventListener('click', async () => {
+    await performDelete('Delete all sites?', () => {
+      workspace.sites = [];
+      selectedSiteId = '';
+      workspace.simulationQueue = [];
+      workspace.reportLatest = [];
+      workspace.reportHistory = [];
+      workspace.savedSiteViews = [];
+      visibleResultRunIds.clear();
+      selectedResultRunId = '';
+      focusedReportQueueItemId = '';
+    });
+  });
+
+  deleteSimulationsButton?.addEventListener('click', async () => {
+    await performDelete('Delete all simulation queue entries?', () => {
+      workspace.simulationQueue = [];
+      focusedReportQueueItemId = '';
+    });
+  });
+
+  deleteResultsButton?.addEventListener('click', async () => {
+    await performDelete('Delete all results (current table + history)?', () => {
+      workspace.reportLatest = [];
+      workspace.reportHistory = [];
+      visibleResultRunIds.clear();
+      selectedResultRunId = '';
+      focusedReportQueueItemId = '';
+    });
+  });
+
+  deleteEverythingButton?.addEventListener('click', async () => {
+    await performDelete('Delete everything in workspace data? This will clear radios, antennas, models, sites, simulations, results, and saved site views.', () => {
+      const prefs = { ...workspace.preferences };
+      workspace = normalizeWorkspace({
+        ...structuredClone(DEFAULT_WORKSPACE),
+        preferences: prefs
+      });
+      selectedSiteId = '';
+      selectedSimulationTxSiteId = '';
+      selectedSimulationSourceRadioId = '';
+      selectedSimulationTxAntennaId = '';
+      selectedPropagationModelId = '';
+      selectedSimulationRxSiteId = '';
+      selectedSimulationReceiverRadioId = '';
+      selectedSimulationRxAntennaId = '';
+      selectedSavedSiteViewId = '';
+      focusedReportQueueItemId = '';
+      selectedResultRunId = '';
+      visibleResultRunIds.clear();
+    });
   });
 }
 
