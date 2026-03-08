@@ -610,7 +610,10 @@ function renderReportsTab(): string {
         : workspace.preferences.distanceUnit === 'feet'
           ? 'ft'
           : 'km';
-  const h = (label: string, unit?: string): string => `<span class="results-th-wrap">${escapeHtml(unit ? `${label} (${unit})` : label)}</span>`;
+  const h = (lines: string[], unit?: string): string => {
+    const parts = unit ? [...lines, `(${unit})`] : lines;
+    return `<span class="results-th-wrap">${parts.slice(0, 3).map((part) => escapeHtml(part)).join('<br/>')}</span>`;
+  };
 
   const visibleRuns = getVisibleResultRuns();
   const visibleRows = visibleRuns.flatMap((run) =>
@@ -675,27 +678,27 @@ function renderReportsTab(): string {
       <table class="results-table">
         <thead>
           <tr>
-            <th>${h('Run Time')}</th>
-            <th>${h('Transmitter Site Name')}</th>
-            <th>${h('Transmitter Coordinates')}</th>
-            <th>${h('Transmitter Radio')}</th>
-            <th>${h('Frequency', 'MHz')}</th>
-            <th>${h('Bandwidth', 'kHz')}</th>
-            <th>${h('Receiver Site Name')}</th>
-            <th>${h('Receiver Coordinates')}</th>
-            <th>${h('Receiver Radio')}</th>
-            <th>${h('Transmitter EIRP', powerUnit)}</th>
-            <th>${h('Transmitter EIRP Density', powerDensityUnit)}</th>
-            <th>${h('Distance', distanceUnit)}</th>
-            <th>${h('Propagation Losses', 'dB')}</th>
-            <th>${h('Power Density at Receive Antenna', powerDensityUnit)}</th>
-            <th>${h('Electric Field Density at Receive Antenna', 'V/m')}</th>
-            <th>${h('Power Density Into Receiver', powerDensityUnit)}</th>
-            <th>${h('Receiver Noise Floor', powerDensityUnit)}</th>
-            <th>${h('SNR in Receiver', 'dB')}</th>
-            <th>${h('Useable Link')}</th>
-            <th>${h('Warnings')}</th>
-            <th>${h('Jump')}</th>
+            <th>${h(['Run', 'Time'])}</th>
+            <th>${h(['TX Site', 'Name'])}</th>
+            <th>${h(['TX', 'Coordinates'])}</th>
+            <th>${h(['TX', 'Radio'])}</th>
+            <th>${h(['Frequency'], 'MHz')}</th>
+            <th>${h(['Bandwidth'], 'kHz')}</th>
+            <th>${h(['RX Site', 'Name'])}</th>
+            <th>${h(['RX', 'Coordinates'])}</th>
+            <th>${h(['RX', 'Radio'])}</th>
+            <th>${h(['TX EIRP'], powerUnit)}</th>
+            <th>${h(['TX EIRP', 'Density'], powerDensityUnit)}</th>
+            <th>${h(['Distance'], distanceUnit)}</th>
+            <th>${h(['Path', 'Loss'], 'dB')}</th>
+            <th>${h(['Pwr Dens', 'at RX Ant'], powerDensityUnit)}</th>
+            <th>${h(['E-Field Dens', 'at RX Ant'], 'V/m')}</th>
+            <th>${h(['Pwr Dens', 'into RX'], powerDensityUnit)}</th>
+            <th>${h(['RX Noise', 'Floor'], powerDensityUnit)}</th>
+            <th>${h(['SNR', 'in RX'], 'dB')}</th>
+            <th>${h(['Usable', 'Link'])}</th>
+            <th>${h(['Warnings'])}</th>
+            <th>${h(['Jump'])}</th>
           </tr>
         </thead>
         <tbody>${rows || '<tr><td colspan="21">No visible result data. Check runs in the queue below.</td></tr>'}</tbody>

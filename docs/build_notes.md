@@ -613,3 +613,15 @@
 - Known Issues / Next Focus:
   - None specific to this milestone.
 - Commit: this commit (`milestone(M45): simulation queue header alignment fix v0.46.0`)
+
+## M46 - Results Header Line-Break Optimization
+- Date: 2026-03-07
+- Version: 0.47.0
+- Completed:
+  - Refined Results table header labels with shorter wording for dense columns.
+  - Added explicit line-break structuring in header labels so long labels use the available 3-line header height more efficiently.
+  - Preserved units in header labels while keeping row values numeric-only.
+  - Updated header text rendering style to improve consistent multi-line readability.
+- Known Issues / Next Focus:
+  - Very narrow windows still require horizontal scrolling for full results visibility.
+- Commit: this commit (`milestone(M46): optimize results header line wraps v0.47.0`)

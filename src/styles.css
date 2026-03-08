@@ -209,13 +209,11 @@ td {
 }
 
 .results-th-wrap {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  display: block;
   overflow: hidden;
   white-space: normal;
   word-break: break-word;
-  line-height: 1.1;
+  line-height: 1.05;
   min-height: 3.3em;
 }
 
