@@ -28,6 +28,11 @@ cp -r dist/* "$WORK_DIR/"
 cp VERSION "$WORK_DIR/VERSION"
 cp docs/LEGAL.md "$WORK_DIR/LEGAL.md"
 cp docs/Manual.md "$WORK_DIR/Manual.md"
+if [[ -f scripts/keys/license-public.spki.base64url.txt ]] || [[ -f scripts/keys/license-private.pkcs8.pem ]]; then
+  mkdir -p "$WORK_DIR/license-keys"
+  [[ -f scripts/keys/license-public.spki.base64url.txt ]] && cp scripts/keys/license-public.spki.base64url.txt "$WORK_DIR/license-keys/"
+  [[ -f scripts/keys/license-private.pkcs8.pem ]] && cp scripts/keys/license-private.pkcs8.pem "$WORK_DIR/license-keys/"
+fi
 
 (
   cd build
