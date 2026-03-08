@@ -2,6 +2,7 @@ import type { AntennaPattern, PropagationModel, RadioSink, RadioSource, Simulati
 
 interface QueueSimulationInputItem {
   queueItemId: string;
+  comments: string;
   txSite: Site;
   sourceRadio: RadioSource;
   txAntenna: { heightM: number; pattern: AntennaPattern; gainOverrideDb?: number };
@@ -92,6 +93,7 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
         receiverRadio: item.receiverRadio.name,
         sourceName: `${item.txSite.name} / ${item.sourceRadio.name}`,
         sinkName: `${item.rxSite.name} / ${item.receiverRadio.name}`,
+        simulationComments: item.comments ?? '',
         transmitterEirpDbm,
         transmitterEirpDensityDbmPerHz,
         distanceKm,

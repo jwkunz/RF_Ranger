@@ -133,6 +133,7 @@ const RESULT_FIELD_OPTIONS: Array<{ id: string; label: string; value: (row: Simu
   { id: 'receiverSiteName', label: 'Receiver Site Name', value: (row) => row.receiverSiteName },
   { id: 'receiverCoordinates', label: 'Receiver Coordinates', value: (row) => row.receiverCoordinates },
   { id: 'receiverRadio', label: 'Receiver Radio', value: (row) => row.receiverRadio },
+  { id: 'simulationComments', label: 'Simulation Comments', value: (row) => row.simulationComments || '' },
   { id: 'transmitterEirp', label: 'Transmitter EIRP', value: (row) => formatPower(row.transmitterEirpDbm) },
   { id: 'transmitterEirpDensity', label: 'Transmitter EIRP Density', value: (row) => formatPowerDensity(row.transmitterEirpDensityDbmPerHz) },
   { id: 'distance', label: 'Distance', value: (row) => formatDistance(row.distanceKm) },
@@ -244,6 +245,7 @@ interface ProgressState {
 
 interface WorkerQueueItem {
   queueItemId: string;
+  comments: string;
   txSite: Site;
   sourceRadio: RadioSource;
   txAntenna: AntennaModel;
@@ -517,7 +519,8 @@ function renderSimulationTab(): string {
         <div>${escapeHtml(modelName)}</div>
         <div>${escapeHtml(rxSiteName)}</div>
         <div>${escapeHtml(receiverName)}</div>
-        <div>${escapeHtml(rxAntennaName)} <button data-remove-queue="${item.id}">Remove</button></div>
+        <div>${escapeHtml(rxAntennaName)}</div>
+        <div>${escapeHtml(item.comments || '')} <button data-remove-queue="${item.id}">Remove</button></div>
       </div>`;
     })
     .join('');
@@ -536,6 +539,7 @@ function renderSimulationTab(): string {
         <div>Receiver Site</div>
         <div>Receiver Radio</div>
         <div>RX Antenna</div>
+        <div>Comments</div>
       </div>
       <div class="sim-columns">
         <label><select id="sim-tx-site">${txSiteOptions || '<option value="">No sites available</option>'}</select></label>
@@ -545,6 +549,7 @@ function renderSimulationTab(): string {
         <label><select id="sim-rx-site">${rxSiteOptions || '<option value="">No sites available</option>'}</select></label>
         <label><select id="sim-receiver-radio">${receiverRadioOptions || '<option value="">No receiver radios available</option>'}</select></label>
         <label><select id="sim-rx-antenna">${rxAntennaOptions || '<option value="">No antennas available</option>'}</select></label>
+        <label><input id="sim-comments" placeholder="Optional simulation notes" /></label>
       </div>
       <div class="action-row">
         <button id="add-to-queue" class="primary-btn">Add to Simulation Queue</button>
@@ -561,6 +566,7 @@ function renderSimulationTab(): string {
         <div>Receiver Site</div>
         <div>Receiver Radio</div>
         <div>RX Antenna</div>
+        <div>Comments</div>
       </div>
       ${queueRows || '<p class="muted">Queue is empty.</p>'}
       <div class="action-row">
@@ -772,10 +778,10 @@ function renderRadiosTab(): string {
       (source) => `
       <tr>
         <td>${escapeHtml(source.name)}</td>
-        <td>${escapeHtml(source.comments || '')}</td>
         <td>${source.txPowerDbm}</td>
         <td>${source.carrierFrequencyMHz}</td>
         <td>${(source.bandwidthHz / 1000).toFixed(3)}</td>
+        <td>${escapeHtml(source.comments || '')}</td>
         <td><button data-edit-source="${source.id}">Edit</button> <button data-delete-source="${source.id}">Delete</button></td>
       </tr>`
     )
@@ -786,12 +792,12 @@ function renderRadiosTab(): string {
       (sink) => `
       <tr>
         <td>${escapeHtml(sink.name)}</td>
-        <td>${escapeHtml(sink.comments || '')}</td>
         <td>${sink.carrierFrequencyMHz}</td>
         <td>${(sink.bandwidthHz / 1000).toFixed(3)}</td>
         <td>${sink.environmentNoiseTemperatureK}</td>
         <td>${sink.noiseFigureDb}</td>
         <td>${sink.requiredSnrDb}</td>
+        <td>${escapeHtml(sink.comments || '')}</td>
         <td><button data-edit-sink="${sink.id}">Edit</button> <button data-delete-sink="${sink.id}">Delete</button></td>
       </tr>`
     )
@@ -803,17 +809,17 @@ function renderRadiosTab(): string {
       <h3>Add Source</h3>
       <form id="add-source-form" class="grid-form">
         <label>Name<input name="name" placeholder="e.g. Base TX" required /></label>
-        <label>Comments<textarea name="comments" rows="2" placeholder="Source notes"></textarea></label>
         <label>TX Power (dBm)<input name="txPowerDbm" type="number" step="0.1" required /></label>
         <label>Carrier Frequency (MHz)<input name="carrierFrequencyMHz" type="number" step="0.001" required /></label>
         <label>Bandwidth (kHz)<input name="bandwidthKHz" type="number" step="0.001" required /></label>
+        <label>Comments<textarea name="comments" rows="2" placeholder="Source notes"></textarea></label>
         <button class="primary-btn" type="submit">Add Source</button>
       </form>
     </section>
     <section class="panel">
       <h3>Sources</h3>
       <table>
-        <thead><tr><th>Name</th><th>Comments</th><th>TX Power (dBm)</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>TX Power (dBm)</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>Comments</th><th>Actions</th></tr></thead>
         <tbody>${sourceRows || '<tr><td colspan="6">No sources yet.</td></tr>'}</tbody>
       </table>
     </section>
@@ -821,19 +827,19 @@ function renderRadiosTab(): string {
       <h3>Add Sink</h3>
       <form id="add-sink-form" class="grid-form">
         <label>Name<input name="name" placeholder="e.g. Remote RX 1" required /></label>
-        <label>Comments<textarea name="comments" rows="2" placeholder="Receiver notes"></textarea></label>
         <label>Carrier Frequency (MHz)<input name="carrierFrequencyMHz" type="number" step="0.001" required /></label>
         <label>Bandwidth (kHz)<input name="bandwidthKHz" type="number" step="0.001" required /></label>
         <label>Environment Noise Temperature (K)<input name="environmentNoiseTemperatureK" type="number" step="1" value="300" required /></label>
         <label>Noise Figure (dB)<input name="noiseFigureDb" type="number" step="0.1" value="10" required /></label>
         <label>Required SNR (dB)<input name="requiredSnrDb" type="number" step="0.1" value="15" required /></label>
+        <label>Comments<textarea name="comments" rows="2" placeholder="Receiver notes"></textarea></label>
         <button class="primary-btn" type="submit">Add Sink</button>
       </form>
     </section>
     <section class="panel">
       <h3>Sinks</h3>
       <table>
-        <thead><tr><th>Name</th><th>Comments</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>Env Temp (K)</th><th>NF (dB)</th><th>Req SNR (dB)</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Freq (MHz)</th><th>BW (kHz)</th><th>Env Temp (K)</th><th>NF (dB)</th><th>Req SNR (dB)</th><th>Comments</th><th>Actions</th></tr></thead>
         <tbody>${sinkRows || '<tr><td colspan="8">No sinks yet.</td></tr>'}</tbody>
       </table>
     </section>
@@ -846,13 +852,13 @@ function renderAntennasTab(): string {
       (antenna) => `
       <tr>
         <td>${escapeHtml(antenna.name)}</td>
-        <td>${escapeHtml(antenna.comments || '')}</td>
         <td>${antenna.heightM}</td>
         <td>${antenna.azimuthDeg}</td>
         <td>${antenna.tiltDeg}</td>
         <td>${antenna.polarization}</td>
         <td>${antenna.pattern}</td>
         <td>${antenna.gainOverrideDb ?? 'default'}</td>
+        <td>${escapeHtml(antenna.comments || '')}</td>
         <td><button data-edit-antenna="${antenna.id}">Edit</button> <button data-delete-antenna="${antenna.id}">Delete</button></td>
       </tr>`
     )
@@ -864,7 +870,6 @@ function renderAntennasTab(): string {
       <h3>Add Antenna</h3>
       <form id="add-antenna-form" class="grid-form">
         <input name="name" placeholder="Name" required />
-        <textarea name="comments" rows="2" placeholder="Antenna notes"></textarea>
         <input name="heightM" type="number" step="0.1" placeholder="Height (m)" required />
         <input name="azimuthDeg" type="number" step="0.1" placeholder="Azimuth (deg)" required />
         <input name="tiltDeg" type="number" step="0.1" placeholder="Tilt (deg)" required />
@@ -881,13 +886,14 @@ function renderAntennasTab(): string {
           <option>Horn</option>
         </select>
         <input name="gainOverrideDb" type="number" step="0.1" placeholder="Gain Override (optional)" />
+        <textarea name="comments" rows="2" placeholder="Antenna notes"></textarea>
         <button class="primary-btn" type="submit">Add Antenna</button>
       </form>
     </section>
     <section class="panel">
       <h3>Known Antennas</h3>
       <table>
-        <thead><tr><th>Name</th><th>Comments</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Gain</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Height</th><th>Azimuth</th><th>Tilt</th><th>Pol</th><th>Pattern</th><th>Gain</th><th>Comments</th><th>Actions</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="9">No antennas yet.</td></tr>'}</tbody>
       </table>
     </section>
@@ -1645,7 +1651,8 @@ async function addSimulationQueueItem(): Promise<void> {
     propagationModelId: selectedPropagationModelId,
     rxSiteId: selectedSimulationRxSiteId,
     receiverRadioId: selectedSimulationReceiverRadioId,
-    rxAntennaId: selectedSimulationRxAntennaId
+    rxAntennaId: selectedSimulationRxAntennaId,
+    comments: String(document.querySelector<HTMLInputElement>('#sim-comments')?.value ?? '').trim()
   };
 
   workspace.simulationQueue.push(item);
@@ -1670,6 +1677,7 @@ async function runSimulationQueue(): Promise<void> {
 
       return {
         queueItemId: item.id,
+        comments: item.comments ?? '',
         txSite,
         sourceRadio,
         txAntenna,
@@ -2206,7 +2214,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
       longitude: number;
       kind?: 'source' | 'sink';
     }>;
-    simulationQueue?: Array<SimulationQueueItem & { txAntennaId?: string; rxAntennaId?: string }>;
+    simulationQueue?: Array<SimulationQueueItem & { txAntennaId?: string; rxAntennaId?: string; comments?: string }>;
     preferences?: WorkspaceSnapshot['preferences'];
     reportHistory?: Array<{ id?: string; createdAtIso?: string; rows?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }> }>;
     reportLatest?: Array<Partial<SimulationResultRow> & { sinkPinId?: string }>;
@@ -2281,6 +2289,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     receiverRadio: row.receiverRadio ?? 'Unknown RX Radio',
     sourceName: row.sourceName ?? 'Unknown Source',
     sinkName: row.sinkName ?? 'Unknown Sink',
+    simulationComments: row.simulationComments ?? '',
     transmitterEirpDbm: row.transmitterEirpDbm ?? 0,
     transmitterEirpDensityDbmPerHz: row.transmitterEirpDensityDbmPerHz ?? 0,
     distanceKm: row.distanceKm ?? 0,
@@ -2313,7 +2322,8 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
   const simulationQueue = (work.simulationQueue ?? []).map((item) => ({
     ...item,
     txAntennaId: item.txAntennaId ?? '',
-    rxAntennaId: item.rxAntennaId ?? ''
+    rxAntennaId: item.rxAntennaId ?? '',
+    comments: item.comments ?? ''
   }));
 
   const savedSiteViews = (work.savedSiteViews ?? [])

@@ -92,6 +92,7 @@ export interface SimulationQueueItem {
   rxSiteId: string;
   receiverRadioId: string;
   rxAntennaId: string;
+  comments: string;
 }
 
 export interface SimulationResultRow {
@@ -108,6 +109,7 @@ export interface SimulationResultRow {
   receiverRadio: string;
   sourceName: string;
   sinkName: string;
+  simulationComments: string;
   transmitterEirpDbm: number;
   transmitterEirpDensityDbmPerHz: number;
   distanceKm: number;

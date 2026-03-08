@@ -540,3 +540,15 @@
 - Known Issues / Next Focus:
   - Default antenna-pattern gains are currently fixed heuristics unless an override gain is provided.
 - Commit: this commit (`milestone(M39): eirp reporting and single-row simulation layout v0.40.0`)
+
+## M40 - Comments Reflow + Simulation Comment Reporting
+- Date: 2026-03-07
+- Version: 0.41.0
+- Completed:
+  - Moved radio and antenna comments fields to the far-right position in create forms and table display columns.
+  - Added a `Comments` field to each Simulation definition line and persisted it in simulation queue entries.
+  - Added simulation comments into simulation result rows and exposed `Simulation Comments` as a selectable field in the Report generator include tree.
+  - Updated Simulation define/queue column layout to include a dedicated rightmost comments column.
+- Known Issues / Next Focus:
+  - Simulation queue comments are currently single-line text; optional future enhancement is expanded multiline notes.
+- Commit: this commit (`milestone(M40): comments reflow and simulation comment reporting v0.41.0`)
