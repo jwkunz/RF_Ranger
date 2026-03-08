@@ -127,13 +127,46 @@ Notes:
 - vt-pbf: MIT
 - which: ISC
 
-## Remote Communication and External Resources
-This application communicates with remote services only for map and geocoding features:
+## Compliance Obligations Checklist
+The items below describe obligations that apply to this project based on current dependency and service choices.
 
-- OpenStreetMap tile service (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`) for map imagery.
-- Nominatim search API (`https://nominatim.openstreetmap.org/search`) for address-to-coordinate lookup.
+### 1) MIT Distribution Requirement (Project License)
+- Include this project's MIT copyright and permission notice in distributed copies.
+- Keep disclaimer language intact ("AS IS", no warranty).
 
-No backend API owned by Numerius Engineering LLC is used in normal application runtime.
+### 2) Third-Party OSS Notices
+- Preserve attribution and license terms for bundled dependencies (MIT/BSD/ISC/Apache-2.0/BlueOak families in current inventory).
+- Keep `docs/LEGAL.md` (or equivalent NOTICE/THIRD_PARTY_LICENSES artifact) in release packages.
+- Resolve `UNKNOWN` entries before release sign-off by verifying package license files in `node_modules` or upstream package repositories.
+
+### 3) Map Tile and Data Attribution (Runtime UI)
+This app currently uses:
+- OpenStreetMap tiles (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`)
+- OpenTopoMap tiles (`https://{a,b,c}.tile.opentopomap.org/{z}/{x}/{y}.png`)
+- CyclOSM tiles (`https://{a,b,c}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png`)
+
+Required actions:
+- Display visible attribution while map layers are used.
+- Include OpenStreetMap attribution and data-license reference:
+  - "© OpenStreetMap contributors"
+  - Open Database License (ODbL): `https://www.openstreetmap.org/copyright`
+- For OpenTopoMap, include provider attribution as required by OpenTopoMap and its published credits/about page.
+- For CyclOSM, include provider attribution as required by CyclOSM plus OpenStreetMap contributor attribution.
+
+### 4) Nominatim Geocoding Usage Policy
+This app uses Nominatim (`https://nominatim.openstreetmap.org/search`) for address lookup.
+
+Required actions:
+- Follow the public Nominatim usage policy:
+  - no abusive or bulk geocoding against the public endpoint,
+  - identify requests appropriately (browser referer/user-agent context),
+  - comply with server-side rate and acceptable-use guidance.
+- If usage grows beyond policy limits, migrate to a self-hosted or commercial geocoding service.
+
+### 5) Remote Communication Disclosure
+No Numerius backend is used in normal runtime. Network calls are limited to:
+- map tile retrieval from third-party tile servers,
+- geocoding requests to Nominatim.
 
 ## Telemetry and Data Collection
 The application does not include analytics SDKs or telemetry beacons in its runtime code path.
@@ -141,7 +174,14 @@ The application does not include analytics SDKs or telemetry beacons in its runt
 Data behavior summary:
 - Workspace data is stored locally in browser IndexedDB.
 - User-triggered exports (JSON, KML, CSV) are generated locally in-browser.
-- The app does not automatically transmit workspace contents to a remote service.
+- The app does not automatically transmit workspace contents to a Numerius-owned remote service.
 
 ## GitHub Release Automation (Development Infrastructure)
 Repository CI/CD may communicate with GitHub Actions and npm registries during build/release workflows. These are development pipeline operations, not in-browser end-user telemetry.
+
+## Policy Reference Links
+- OpenStreetMap Copyright / Attribution: `https://www.openstreetmap.org/copyright`
+- OSMF Tile Usage Policy: `https://operations.osmfoundation.org/policies/tiles/`
+- OSMF Nominatim Usage Policy: `https://operations.osmfoundation.org/policies/nominatim/`
+- OpenTopoMap: `https://opentopomap.org/about`
+- CyclOSM: `https://www.cyclosm.org/`

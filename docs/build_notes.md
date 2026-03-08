@@ -898,3 +898,16 @@
 - Known Issues / Next Focus:
   - Optional enhancement: add per-action undo/restore guardrails beyond JSON backup.
 - Commit: this commit (`milestone(M64): add preferences data management and bulk delete actions v0.65.0`)
+
+## M65 - Legal Compliance Obligations Update
+- Date: 2026-03-07
+- Version: 0.66.0
+- Completed:
+  - Updated `docs/LEGAL.md` with an explicit compliance obligations checklist.
+  - Added required attribution obligations for OpenStreetMap, OpenTopoMap, and CyclOSM tile usage.
+  - Added Nominatim usage-policy obligations and scaling guidance.
+  - Clarified OSS notice/distribution obligations and handling of `UNKNOWN` dependency licenses.
+  - Added policy reference links for OSMF tile and Nominatim policies.
+- Known Issues / Next Focus:
+  - Optional follow-up: add automated generation of THIRD_PARTY_LICENSES and CI gate for unresolved `UNKNOWN` licenses.
+- Commit: this commit (`milestone(M65): update LEGAL obligations and policy references v0.66.0`)
