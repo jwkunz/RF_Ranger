@@ -647,3 +647,24 @@
 - Known Issues / Next Focus:
   - None specific to this milestone.
 - Commit: this commit (`milestone(M48): simplify simulation queue alignment and actions v0.49.0`)
+
+## M49 - 3D Directional Antenna Gain Integration
+- Date: 2026-03-07
+- Version: 0.50.0
+- Completed:
+  - Added directional TX/RX gain evaluation in simulation worker using both azimuth and elevation offsets from antenna boresight.
+  - Added geometry calculations for:
+    - initial bearing TX->RX and RX->TX
+    - elevation look angles based on site separation and antenna heights
+  - Replaced fixed pattern gain usage with directional gain pipeline:
+    - boresight/base gain from pattern default or override
+    - minus pattern attenuation from off-boresight azimuth/elevation
+  - Implemented analytic 3D attenuation helpers for supported patterns:
+    - Omnidirectional
+    - Vertical Dipole
+    - Vertical Monopole
+    - Horizontal Dipole
+    - Horn
+- Known Issues / Next Focus:
+  - Pattern expressions are currently encoded in worker logic; next milestone will add UI visualization and markdown equation pane for direct verification.
+- Commit: this commit (`milestone(M49): integrate 3d directional antenna gain math v0.50.0`)

@@ -5,11 +5,11 @@ interface QueueSimulationInputItem {
   comments: string;
   txSite: Site;
   sourceRadio: RadioSource;
-  txAntenna: { heightM: number; pattern: AntennaPattern; gainOverrideDb?: number };
+  txAntenna: { heightM: number; azimuthDeg: number; tiltDeg: number; pattern: AntennaPattern; gainOverrideDb?: number };
   propagationModel: PropagationModel;
   rxSite: Site;
   receiverRadio: RadioSink;
-  rxAntenna: { heightM: number; pattern: AntennaPattern; gainOverrideDb?: number };
+  rxAntenna: { heightM: number; azimuthDeg: number; tiltDeg: number; pattern: AntennaPattern; gainOverrideDb?: number };
 }
 
 interface SimulationInput {
@@ -42,6 +42,11 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
       const item = input.items[i];
       const distanceKm = haversineKm(item.txSite.latitude, item.txSite.longitude, item.rxSite.latitude, item.rxSite.longitude);
       const frequencyMHz = item.sourceRadio.carrierFrequencyMHz;
+      const txToRxBearingDeg = initialBearingDeg(item.txSite.latitude, item.txSite.longitude, item.rxSite.latitude, item.rxSite.longitude);
+      const rxToTxBearingDeg = initialBearingDeg(item.rxSite.latitude, item.rxSite.longitude, item.txSite.latitude, item.txSite.longitude);
+      const horizontalDistanceM = Math.max(distanceKm * 1000, 0.001);
+      const txToRxElevationDeg = radiansToDegrees(Math.atan2(item.rxAntenna.heightM - item.txAntenna.heightM, horizontalDistanceM));
+      const rxToTxElevationDeg = radiansToDegrees(Math.atan2(item.txAntenna.heightM - item.rxAntenna.heightM, horizontalDistanceM));
 
       const baseFsplDb = 20 * Math.log10(Math.max(distanceKm, 0.001)) + 20 * Math.log10(Math.max(frequencyMHz, 0.001)) + 32.44;
       const extraLossDb = modelLossAdjustmentDb(
@@ -53,8 +58,8 @@ self.onmessage = (event: MessageEvent<SimulationInput>) => {
       );
       const totalPathLossDb = baseFsplDb + extraLossDb;
 
-      const txGainDb = antennaGainDb(item.txAntenna.pattern, item.txAntenna.gainOverrideDb);
-      const rxGainDb = antennaGainDb(item.rxAntenna.pattern, item.rxAntenna.gainOverrideDb);
+      const txGainDb = directionalAntennaGainDb(item.txAntenna, txToRxBearingDeg, txToRxElevationDeg);
+      const rxGainDb = directionalAntennaGainDb(item.rxAntenna, rxToTxBearingDeg, rxToTxElevationDeg);
       const transmitterEirpDbm = item.sourceRadio.txPowerDbm + txGainDb;
       const txPowerDensityDbmPerHz = item.sourceRadio.txPowerDbm - 10 * Math.log10(Math.max(item.sourceRadio.bandwidthHz, 1));
       const transmitterEirpDensityDbmPerHz = txPowerDensityDbmPerHz + txGainDb;
@@ -192,7 +197,19 @@ function thermalNoiseDensityDbmPerHz(temperatureK: number, noiseFigureDb: number
   return 10 * Math.log10(noiseWatts * 1000);
 }
 
-function antennaGainDb(pattern: AntennaPattern, gainOverrideDb?: number): number {
+function directionalAntennaGainDb(
+  antenna: { pattern: AntennaPattern; gainOverrideDb?: number; azimuthDeg: number; tiltDeg: number },
+  targetBearingDeg: number,
+  targetElevationDeg: number
+): number {
+  const boresightGainDb = antennaBaseGainDb(antenna.pattern, antenna.gainOverrideDb);
+  const azOffsetDeg = normalizedAngleDifferenceDeg(targetBearingDeg, antenna.azimuthDeg);
+  const elOffsetDeg = normalizedAngleDifferenceDeg(targetElevationDeg, antenna.tiltDeg);
+  const attenuationDb = antennaPatternAttenuationDb(antenna.pattern, azOffsetDeg, elOffsetDeg);
+  return boresightGainDb - attenuationDb;
+}
+
+function antennaBaseGainDb(pattern: AntennaPattern, gainOverrideDb?: number): number {
   if (typeof gainOverrideDb === 'number' && Number.isFinite(gainOverrideDb)) {
     return gainOverrideDb;
   }
@@ -210,6 +227,82 @@ function antennaGainDb(pattern: AntennaPattern, gainOverrideDb?: number): number
     default:
       return 0;
   }
+}
+
+function antennaPatternAttenuationDb(pattern: AntennaPattern, azOffsetDeg: number, elOffsetDeg: number): number {
+  const absAz = Math.abs(azOffsetDeg);
+  const absEl = Math.abs(elOffsetDeg);
+
+  switch (pattern) {
+    case 'Omnidirectional':
+      return 0;
+    case 'Vertical Dipole':
+      return verticalDipoleAttenuationDb(elOffsetDeg);
+    case 'Vertical Monopole':
+      return verticalMonopoleAttenuationDb(elOffsetDeg);
+    case 'Horizontal Dipole':
+      return horizontalDipoleAttenuationDb(azOffsetDeg, elOffsetDeg);
+    case 'Horn':
+      return hornAttenuationDb(absAz, absEl);
+    default:
+      return 0;
+  }
+}
+
+function verticalDipoleAttenuationDb(elOffsetDeg: number): number {
+  // Donut pattern with max broadside at horizon: power ~ cos^2(elevation).
+  const power = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** 2, 1e-6);
+  return -10 * Math.log10(power);
+}
+
+function verticalMonopoleAttenuationDb(elOffsetDeg: number): number {
+  // Monopole follows a similar broadside elevation pattern in upper hemisphere.
+  const power = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** 2, 1e-6);
+  return -10 * Math.log10(power);
+}
+
+function horizontalDipoleAttenuationDb(azOffsetDeg: number, elOffsetDeg: number): number {
+  // Approximate 3D figure-8: broadside azimuth + horizon emphasis in elevation.
+  const azPower = Math.max(Math.cos(degreesToRadians(azOffsetDeg)) ** 2, 1e-6);
+  const elPower = Math.max(Math.cos(degreesToRadians(elOffsetDeg)) ** 2, 1e-6);
+  const power = Math.max(azPower * elPower, 1e-6);
+  return -10 * Math.log10(power);
+}
+
+function hornAttenuationDb(absAzOffsetDeg: number, absElOffsetDeg: number): number {
+  // Gaussian-like main lobe with conservative side-lobe floor.
+  const az3DbBwDeg = 30;
+  const el3DbBwDeg = 30;
+  const attenuation =
+    12 * (absAzOffsetDeg / Math.max(az3DbBwDeg, 0.1)) ** 2 + 12 * (absElOffsetDeg / Math.max(el3DbBwDeg, 0.1)) ** 2;
+  return Math.min(attenuation, 40);
+}
+
+function normalizedAngleDifferenceDeg(aDeg: number, bDeg: number): number {
+  let diff = ((aDeg - bDeg + 180) % 360) - 180;
+  if (diff < -180) {
+    diff += 360;
+  }
+  return diff;
+}
+
+function degreesToRadians(valueDeg: number): number {
+  return (valueDeg * Math.PI) / 180;
+}
+
+function radiansToDegrees(valueRad: number): number {
+  return (valueRad * 180) / Math.PI;
+}
+
+function initialBearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const phi1 = degreesToRadians(lat1);
+  const phi2 = degreesToRadians(lat2);
+  const lambda1 = degreesToRadians(lon1);
+  const lambda2 = degreesToRadians(lon2);
+  const y = Math.sin(lambda2 - lambda1) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(lambda2 - lambda1);
+  const bearing = radiansToDegrees(Math.atan2(y, x));
+  return (bearing + 360) % 360;
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
