@@ -528,7 +528,7 @@ function renderSimulationTab(): string {
       const receiverName = workspace.sinks.find((sink) => sink.id === item.receiverRadioId)?.name ?? '[missing receiver]';
       const rxAntennaName = workspace.antennas.find((antenna) => antenna.id === item.rxAntennaId)?.name ?? '[missing rx antenna]';
       return `
-      <div class="sim-columns sim-columns--queue">
+      <div class="sim-columns sim-columns--queue-grid sim-columns--queue">
         <div>${escapeHtml(txSiteName)}</div>
         <div>${escapeHtml(sourceName)}</div>
         <div>${escapeHtml(txAntennaName)}</div>
@@ -548,7 +548,7 @@ function renderSimulationTab(): string {
     <h2>Simulation</h2>
     <section class="panel simulation-section">
       <h3>Define Simulation</h3>
-      <div class="sim-columns sim-columns--header">
+      <div class="sim-columns sim-columns--header sim-columns--queue-grid">
         <div>Transmitter Site</div>
         <div>Source Radio</div>
         <div>TX Antenna</div>

@@ -602,3 +602,14 @@
 - Known Issues / Next Focus:
   - Dense tables can still require horizontal scrolling on smaller screens.
 - Commit: this commit (`milestone(M44): compact results headers and numeric-only values v0.45.0`)
+
+## M45 - Simulation Queue Header/Grid Alignment Fix
+- Date: 2026-03-07
+- Version: 0.46.0
+- Completed:
+  - Fixed Simulation Queue header misalignment where `Actions` wrapped to a second row.
+  - Added dedicated queue grid column class and applied it to both queue header and queue rows.
+  - Ensured `Comments` and `Remove` button remain in distinct columns within the same row layout.
+- Known Issues / Next Focus:
+  - None specific to this milestone.
+- Commit: this commit (`milestone(M45): simulation queue header alignment fix v0.46.0`)
