@@ -20,7 +20,14 @@ export type AntennaPattern =
   | 'Vertical Dipole'
   | 'Vertical Monopole'
   | 'Horizontal Dipole'
-  | 'Horn';
+  | 'Horn'
+  | 'Custom CSV';
+
+export interface AntennaPatternPoint {
+  azimuthDeg: number;
+  elevationDeg: number;
+  gainDbi: number;
+}
 
 export type PropagationModelType =
   | 'Free Space'
@@ -61,6 +68,7 @@ export interface AntennaModel {
   tiltDeg: number;
   pattern: AntennaPattern;
   patternParameters: Record<string, number>;
+  customPatternPoints?: AntennaPatternPoint[];
   gainOverrideDb?: number;
 }
 

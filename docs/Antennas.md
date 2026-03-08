@@ -101,3 +101,42 @@ A(\Delta\phi,\Delta\theta)=12\left(\frac{|\Delta\phi|}{\phi_{3dB}}\right)^2+12\l
 $$
 
 with beamwidths inferred from aperture dimensions and wavelength.
+
+# Custom CSV
+
+Upload a custom 3D gain pattern sampled over azimuth/elevation offsets relative to boresight.
+
+The software expects gains directly in dBi and interpolates nearby samples for intermediate angles.
+
+CSV header (required):
+
+$$
+\texttt{azimuth\_deg,elevation\_deg,gain\_dbi}
+$$
+
+Column definitions:
+
+$$
+\Delta\phi=\texttt{azimuth\_deg}\in[-180,180],\quad
+\Delta\theta=\texttt{elevation\_deg}\in[-90,90],\quad
+G(\Delta\phi,\Delta\theta)=\texttt{gain\_dbi}
+$$
+
+Interpolation used by the app:
+
+$$
+G_{\text{interp}}=\frac{\sum_i w_i G_i}{\sum_i w_i},\quad
+w_i=\frac{1}{d_i^2+\epsilon},\quad
+d_i^2=(\Delta\phi-\Delta\phi_i)^2+(\Delta\theta-\Delta\theta_i)^2
+$$
+
+Example:
+
+```csv
+azimuth_deg,elevation_deg,gain_dbi
+0,0,12.0
+15,0,11.4
+30,0,9.8
+0,10,11.1
+0,20,9.2
+```

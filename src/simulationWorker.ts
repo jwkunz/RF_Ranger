@@ -1,4 +1,4 @@
-import type { AntennaPattern, PropagationModel, RadioSink, RadioSource, SimulationResultRow, Site } from './types';
+import type { AntennaPattern, AntennaPatternPoint, PropagationModel, RadioSink, RadioSource, SimulationResultRow, Site } from './types';
 
 interface QueueSimulationInputItem {
   queueItemId: string;
@@ -11,6 +11,7 @@ interface QueueSimulationInputItem {
     tiltDeg: number;
     pattern: AntennaPattern;
     patternParameters: Record<string, number>;
+    customPatternPoints?: AntennaPatternPoint[];
     gainOverrideDb?: number;
   };
   propagationModel: PropagationModel;
@@ -22,6 +23,7 @@ interface QueueSimulationInputItem {
     tiltDeg: number;
     pattern: AntennaPattern;
     patternParameters: Record<string, number>;
+    customPatternPoints?: AntennaPatternPoint[];
     gainOverrideDb?: number;
   };
 }
@@ -226,6 +228,7 @@ function directionalAntennaGainDb(
   antenna: {
     pattern: AntennaPattern;
     patternParameters: Record<string, number>;
+    customPatternPoints?: AntennaPatternPoint[];
     gainOverrideDb?: number;
     azimuthDeg: number;
     tiltDeg: number;
@@ -237,6 +240,9 @@ function directionalAntennaGainDb(
   const boresightGainDb = antennaBaseGainDb(antenna.pattern, antenna.gainOverrideDb);
   const azOffsetDeg = normalizedAngleDifferenceDeg(targetBearingDeg, antenna.azimuthDeg);
   const elOffsetDeg = normalizedAngleDifferenceDeg(targetElevationDeg, antenna.tiltDeg);
+  if (antenna.pattern === 'Custom CSV') {
+    return interpolateCustomPatternGain(antenna.customPatternPoints ?? [], azOffsetDeg, elOffsetDeg, boresightGainDb);
+  }
   const attenuationDb = antennaPatternAttenuationDb(antenna.pattern, antenna.patternParameters, azOffsetDeg, elOffsetDeg, frequencyMHz);
   return boresightGainDb - attenuationDb;
 }
@@ -256,6 +262,8 @@ function antennaBaseGainDb(pattern: AntennaPattern, gainOverrideDb?: number): nu
       return 1.6;
     case 'Horn':
       return 10;
+    case 'Custom CSV':
+      return 0;
     default:
       return 0;
   }
@@ -288,9 +296,48 @@ function antennaPatternAttenuationDb(
         patternParameters.hornLengthB ?? 0.2,
         frequencyMHz
       );
+    case 'Custom CSV':
+      return 0;
     default:
       return 0;
   }
+}
+
+function interpolateCustomPatternGain(
+  points: AntennaPatternPoint[],
+  azimuthOffsetDeg: number,
+  elevationOffsetDeg: number,
+  fallbackGainDbi: number
+): number {
+  if (!points.length) {
+    return fallbackGainDbi;
+  }
+  const nearest = points
+    .map((point) => {
+      const dAz = Math.abs(normalizedAngleDifferenceDeg(azimuthOffsetDeg, point.azimuthDeg));
+      const dEl = Math.abs(elevationOffsetDeg - point.elevationDeg);
+      const distance = Math.sqrt(dAz * dAz + dEl * dEl);
+      return { point, distance };
+    })
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 4);
+  if (!nearest.length) {
+    return fallbackGainDbi;
+  }
+  if (nearest[0].distance < 1e-6) {
+    return nearest[0].point.gainDbi;
+  }
+  const weighted = nearest.reduce(
+    (acc, entry) => {
+      const weight = 1 / Math.max(entry.distance * entry.distance, 1e-6);
+      return {
+        totalWeight: acc.totalWeight + weight,
+        weightedGain: acc.weightedGain + (entry.point.gainDbi * weight)
+      };
+    },
+    { totalWeight: 0, weightedGain: 0 }
+  );
+  return weighted.totalWeight > 0 ? weighted.weightedGain / weighted.totalWeight : fallbackGainDbi;
 }
 
 function verticalDipoleAttenuationDb(elOffsetDeg: number, exponent: number): number {

@@ -852,3 +852,17 @@
 - Known Issues / Next Focus:
   - Optional enhancement: expose explicit world-frame cut controls for side-by-side comparison of raw pattern vs boresight-rotated pattern.
 - Commit: this commit (`milestone(M61): remove polarization and apply boresight-aware visualization v0.62.0`)
+
+## M62 - Custom Antenna Gain Pattern CSV Import
+- Date: 2026-03-07
+- Version: 0.63.0
+- Completed:
+  - Added `Custom CSV` as a selectable antenna pattern type.
+  - Added CSV upload support in Add Antenna with required header: `azimuth_deg,elevation_deg,gain_dbi`.
+  - Stored uploaded custom pattern samples with the antenna model for persistence and reuse.
+  - Updated pattern visualization to evaluate custom patterns via weighted nearest-sample interpolation.
+  - Updated simulation worker directional gain math to use the same interpolation path for `Custom CSV` antennas.
+  - Documented CSV format and interpolation behavior in `docs/Antennas.md`, which also feeds the in-app Pattern Equation Reference panel.
+- Known Issues / Next Focus:
+  - Optional enhancement: add a CSV template download and stricter range validation UI for angle bounds.
+- Commit: this commit (`milestone(M62): add custom antenna CSV pattern import v0.63.0`)

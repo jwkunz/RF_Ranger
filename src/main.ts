@@ -17,6 +17,7 @@ import { exportReportsCsv, exportSitesKml, exportWorkspaceJson, parseSitesKml, p
 import { loadWorkspace, saveWorkspace } from './storage';
 import type {
   AntennaModel,
+  AntennaPatternPoint,
   AntennaPattern,
   PropagationModel,
   PropagationModelType,
@@ -130,7 +131,8 @@ const antennaPatternParameterDefaults: Record<AntennaPattern, Record<string, num
   'Vertical Dipole': { directivityExponent: 2 },
   'Vertical Monopole': { directivityExponent: 2 },
   'Horizontal Dipole': { azimuthExponent: 2, elevationExponent: 2 },
-  Horn: { hornWidthA: 0.25, hornLengthB: 0.2 }
+  Horn: { hornWidthA: 0.25, hornLengthB: 0.2 },
+  'Custom CSV': {}
 };
 
 const antennaPatternParameterMeta: Record<AntennaPattern, Record<string, { label: string; units?: string; symbol: string; description: string }>> = {
@@ -174,7 +176,8 @@ const antennaPatternParameterMeta: Record<AntennaPattern, Record<string, { label
       symbol: 'B',
       description: 'Rectangular horn aperture length.'
     }
-  }
+  },
+  'Custom CSV': {}
 };
 
 const modelGuideMarkdown = new MarkdownIt({ html: false, linkify: true, typographer: false }).use(texmath, {
@@ -371,6 +374,8 @@ let antennaPatternCutMode: 'azimuth' | 'elevation' = 'azimuth';
 let antennaPatternFixedAngleDeg = 0;
 let antennaPatternMarkerAngleDeg = 0;
 let selectedAntennaPreviewId = '';
+let antennaPatternDraftCsvName = '';
+let antennaPatternDraftPoints: AntennaPatternPoint[] = [];
 let selectedReportTreeIds = new Set<string>(
   REPORT_TREE.flatMap((category) => [category.id, ...category.fields.map((field) => field.id)])
 );
@@ -954,12 +959,13 @@ function renderRadiosTab(): string {
 }
 
 function renderAntennasTab(): string {
-  const patternOptions: AntennaPattern[] = ['Omnidirectional', 'Vertical Dipole', 'Vertical Monopole', 'Horizontal Dipole', 'Horn'];
+  const patternOptions: AntennaPattern[] = ['Omnidirectional', 'Vertical Dipole', 'Vertical Monopole', 'Horizontal Dipole', 'Horn', 'Custom CSV'];
   const previewAntenna = selectedAntennaPreviewId
     ? (workspace.antennas.find((antenna) => antenna.id === selectedAntennaPreviewId) ?? null)
     : null;
   const effectivePreviewPattern = previewAntenna?.pattern ?? antennaPatternPreviewType;
   const effectivePreviewParams = previewAntenna?.patternParameters ?? antennaPatternParameterDefaults[effectivePreviewPattern];
+  const effectivePreviewCustomPoints = previewAntenna?.customPatternPoints ?? (effectivePreviewPattern === 'Custom CSV' ? antennaPatternDraftPoints : []);
   const cutModeOptions = [
     { value: 'azimuth', label: 'Azimuth Cut' },
     { value: 'elevation', label: 'Elevation Cut' }
@@ -997,6 +1003,7 @@ function renderAntennasTab(): string {
   const markerGainDb = antennaPatternGainDb(
     effectivePreviewPattern,
     effectivePreviewParams,
+    effectivePreviewCustomPoints,
     previewPeakGainDbi,
     antennaPatternCutMode === 'azimuth' ? clampedMarkerAngle : clampedFixedAngle,
     antennaPatternCutMode === 'azimuth' ? clampedFixedAngle : clampedMarkerAngle,
@@ -1006,6 +1013,7 @@ function renderAntennasTab(): string {
   const previewSvg = renderAntennaPatternPolarSvg(
     effectivePreviewPattern,
     effectivePreviewParams,
+    effectivePreviewCustomPoints,
     previewPeakGainDbi,
     antennaPatternCutMode,
     clampedFixedAngle,
@@ -1014,20 +1022,35 @@ function renderAntennasTab(): string {
     previewAntenna?.tiltDeg ?? 0
   );
   const patternReferenceHtml = renderModelGuideHtml(extractAntennaPatternSection(antennaPatternPreviewType, antennasMarkdown));
+  const csvStatus = previewAntenna
+    ? previewAntenna.pattern === 'Custom CSV'
+      ? `Loaded ${previewAntenna.customPatternPoints?.length ?? 0} points from saved antenna`
+      : 'Select "Custom CSV" to use uploaded pattern data.'
+    : antennaPatternPreviewType === 'Custom CSV'
+      ? antennaPatternDraftPoints.length
+        ? `Loaded ${antennaPatternDraftPoints.length} points from ${escapeHtml(antennaPatternDraftCsvName || 'uploaded CSV')}.`
+        : 'Upload a CSV file with azimuth/elevation/gain samples.'
+      : 'Select "Custom CSV" to use uploaded pattern data.';
   const rows = workspace.antennas
     .map(
-      (antenna) => `
+      (antenna) => {
+        const parameterSummary =
+          antenna.pattern === 'Custom CSV'
+            ? { points: antenna.customPatternPoints?.length ?? 0 }
+            : antenna.patternParameters;
+        return `
       <tr>
         <td>${escapeHtml(antenna.name)}</td>
         <td>${antenna.heightM}</td>
         <td>${antenna.azimuthDeg}</td>
         <td>${antenna.tiltDeg}</td>
         <td>${escapeHtml(antennaPatternDisplayName(antenna.pattern))}</td>
-        <td><code>${escapeHtml(JSON.stringify(antenna.patternParameters))}</code></td>
+        <td><code>${escapeHtml(JSON.stringify(parameterSummary))}</code></td>
         <td>${(antenna.gainOverrideDb ?? defaultPeakGainDbiForPattern(antenna.pattern)).toFixed(2)}</td>
         <td>${escapeHtml(antenna.comments || '')}</td>
         <td><button data-edit-antenna="${antenna.id}">Edit</button> <button data-delete-antenna="${antenna.id}">Delete</button></td>
       </tr>`
+      }
     )
     .join('');
 
@@ -1048,6 +1071,10 @@ function renderAntennasTab(): string {
             <legend>Pattern Parameters</legend>
             ${parameterInputs || '<p class="muted">No additional parameters for this pattern.</p>'}
           </fieldset>
+          <label>Custom Pattern CSV
+            <input id="antenna-pattern-csv" type="file" accept=".csv,text/csv" ${selectedAntennaPreviewId ? 'disabled' : ''} />
+            <small class="field-help">Expected columns: <code>azimuth_deg,elevation_deg,gain_dbi</code>. ${csvStatus}</small>
+          </label>
           <label>Peak Gain (dBi)<input name="gainOverrideDb" type="number" step="0.1" value="${defaultPeakGainDbiForPattern(antennaPatternPreviewType).toFixed(2)}" /></label>
           <label>Comments<textarea name="comments" rows="2" placeholder="Antenna notes"></textarea></label>
           <button class="primary-btn" type="submit">Add Antenna</button>
@@ -2437,6 +2464,7 @@ function wireAntennaEvents(): void {
     const errorEl = document.querySelector<HTMLElement>('#antenna-pattern-error');
     let pattern: AntennaPattern;
     let parameters: Record<string, number>;
+    let customPatternPoints: AntennaPatternPoint[] = [];
     let peakGainDbi: number;
     let boresightAzimuthDeg = 0;
     let boresightTiltDeg = 0;
@@ -2445,6 +2473,7 @@ function wireAntennaEvents(): void {
     if (selected) {
       pattern = selected.pattern;
       parameters = selected.patternParameters ?? antennaPatternParameterDefaults[pattern];
+      customPatternPoints = selected.customPatternPoints ?? [];
       peakGainDbi = selected.gainOverrideDb ?? defaultPeakGainDbiForPattern(pattern);
       boresightAzimuthDeg = selected.azimuthDeg;
       boresightTiltDeg = selected.tiltDeg;
@@ -2454,6 +2483,7 @@ function wireAntennaEvents(): void {
       pattern = patternFromForm ?? antennaPatternPreviewType;
       const defaults = antennaPatternParameterDefaults[pattern];
       parameters = { ...defaults };
+      customPatternPoints = pattern === 'Custom CSV' ? antennaPatternDraftPoints : [];
       const peakInput = form?.querySelector<HTMLInputElement>('input[name="gainOverrideDb"]');
       const rawPeak = peakInput?.value?.trim() ?? '';
       const parsedPeak = Number.parseFloat(rawPeak);
@@ -2476,6 +2506,9 @@ function wireAntennaEvents(): void {
         } else {
           parameters[key] = parsed;
         }
+      }
+      if (pattern === 'Custom CSV' && customPatternPoints.length < 2 && !errorMessage) {
+        errorMessage = 'Upload a valid custom pattern CSV with at least 2 sample rows.';
       }
       const rawAzimuth = form?.querySelector<HTMLInputElement>('input[name="azimuthDeg"]')?.value?.trim() ?? '';
       const rawTilt = form?.querySelector<HTMLInputElement>('input[name="tiltDeg"]')?.value?.trim() ?? '';
@@ -2513,6 +2546,7 @@ function wireAntennaEvents(): void {
     plot.innerHTML = renderAntennaPatternPolarSvg(
       pattern,
       parameters,
+      customPatternPoints,
       peakGainDbi,
       antennaPatternCutMode,
       antennaPatternFixedAngleDeg,
@@ -2523,6 +2557,7 @@ function wireAntennaEvents(): void {
     const gainDb = antennaPatternGainDb(
       pattern,
       parameters,
+      customPatternPoints,
       peakGainDbi,
       antennaPatternCutMode === 'azimuth' ? antennaPatternMarkerAngleDeg : antennaPatternFixedAngleDeg,
       antennaPatternCutMode === 'azimuth' ? antennaPatternFixedAngleDeg : antennaPatternMarkerAngleDeg,
@@ -2615,6 +2650,32 @@ function wireAntennaEvents(): void {
     selectedAntennaPreviewId = '';
     render();
   });
+  const csvInput = form?.querySelector<HTMLInputElement>('#antenna-pattern-csv');
+  csvInput?.addEventListener('change', async () => {
+    const file = csvInput.files?.[0];
+    if (!file) {
+      antennaPatternDraftCsvName = '';
+      antennaPatternDraftPoints = [];
+      updateAntennaPlot();
+      wireAntennaPlotDrag();
+      return;
+    }
+    try {
+      const parsed = await parseAntennaPatternCsv(file);
+      antennaPatternDraftCsvName = file.name;
+      antennaPatternDraftPoints = parsed;
+      updateAntennaPlot();
+      wireAntennaPlotDrag();
+      render();
+    } catch (error) {
+      alert(`Custom pattern CSV import failed: ${String(error)}`);
+      csvInput.value = '';
+      antennaPatternDraftCsvName = '';
+      antennaPatternDraftPoints = [];
+      updateAntennaPlot();
+      wireAntennaPlotDrag();
+    }
+  });
   form
     ?.querySelectorAll<HTMLInputElement>('[data-antenna-param]')
     .forEach((input) =>
@@ -2646,8 +2707,13 @@ function wireAntennaEvents(): void {
       tiltDeg: toNumber(data.get('tiltDeg')),
       pattern,
       patternParameters,
+      customPatternPoints: pattern === 'Custom CSV' ? antennaPatternDraftPoints.map((point) => ({ ...point })) : undefined,
       gainOverrideDb: rawGain ? Number.parseFloat(rawGain) : undefined
     };
+    if (pattern === 'Custom CSV' && (!antenna.customPatternPoints || antenna.customPatternPoints.length < 2)) {
+      alert('Upload a valid custom pattern CSV before adding a Custom CSV antenna.');
+      return;
+    }
     workspace.antennas.push(antenna);
     selectedAntennaPreviewId = antenna.id;
     antennaPatternPreviewType = antenna.pattern;
@@ -2797,7 +2863,7 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     schemaVersion?: number;
     sources?: Array<RadioSource & { comments?: string }>;
     sinks?: Array<RadioSink & { environmentNoiseTemperatureK?: number; noiseFigureDb?: number; requiredSnrDb?: number }>;
-    antennas?: Array<AntennaModel & { comments?: string; patternParameters?: Record<string, number> }>;
+    antennas?: Array<AntennaModel & { comments?: string; patternParameters?: Record<string, number>; customPatternPoints?: AntennaPatternPoint[] }>;
     propagationModels?: Array<PropagationModel & { comments?: string }>;
     sites?: Site[];
     pins?: Array<{
@@ -2836,7 +2902,16 @@ function normalizeWorkspace(raw: WorkspaceSnapshot): WorkspaceSnapshot {
   const antennas = (work.antennas ?? []).map((antenna) => ({
     ...antenna,
     comments: antenna.comments ?? '',
-    patternParameters: normalizeAntennaPatternParameters(antenna.pattern, antenna.patternParameters)
+    patternParameters: normalizeAntennaPatternParameters(antenna.pattern, antenna.patternParameters),
+    customPatternPoints:
+      antenna.pattern === 'Custom CSV'
+        ? (antenna.customPatternPoints ?? []).filter(
+            (point) =>
+              Number.isFinite(point?.azimuthDeg) &&
+              Number.isFinite(point?.elevationDeg) &&
+              Number.isFinite(point?.gainDbi)
+          )
+        : undefined
   }));
 
   const propagationModels = (work.propagationModels ?? []).map((model) => ({
@@ -3110,6 +3185,7 @@ function downloadDataUrl(dataUrl: string, fileName: string): void {
 function renderAntennaPatternPolarSvg(
   pattern: AntennaPattern,
   patternParameters: Record<string, number>,
+  customPatternPoints: AntennaPatternPoint[],
   peakGainDbi: number,
   cutMode: 'azimuth' | 'elevation',
   fixedAngleDeg: number,
@@ -3130,6 +3206,7 @@ function renderAntennaPatternPolarSvg(
     const gainDb = antennaPatternGainDb(
       pattern,
       patternParameters,
+      customPatternPoints,
       peakGainDbi,
       azOffset,
       elOffset,
@@ -3148,6 +3225,7 @@ function renderAntennaPatternPolarSvg(
   const markerGainDb = antennaPatternGainDb(
     pattern,
     patternParameters,
+    customPatternPoints,
     peakGainDbi,
     markerAz,
     markerEl,
@@ -3186,6 +3264,7 @@ function renderAntennaPatternPolarSvg(
 function antennaPatternGainDb(
   pattern: AntennaPattern,
   patternParameters: Record<string, number>,
+  customPatternPoints: AntennaPatternPoint[],
   peakGainDbi: number,
   worldAzimuthDeg: number,
   worldElevationDeg: number,
@@ -3194,6 +3273,9 @@ function antennaPatternGainDb(
 ): number {
   const azimuthOffsetDeg = normalizedAngleDifferenceDeg(worldAzimuthDeg, boresightAzimuthDeg);
   const elevationOffsetDeg = normalizedAngleDifferenceDeg(worldElevationDeg, boresightTiltDeg);
+  if (pattern === 'Custom CSV') {
+    return interpolateCustomPatternGain(customPatternPoints, azimuthOffsetDeg, elevationOffsetDeg, peakGainDbi);
+  }
   const attenuationDb = antennaPatternAttenuationDb(pattern, patternParameters, azimuthOffsetDeg, elevationOffsetDeg);
   return peakGainDbi - attenuationDb;
 }
@@ -3245,6 +3327,98 @@ function normalizedAngleDifferenceDeg(valueDeg: number, referenceDeg: number): n
     diff += 360;
   }
   return diff;
+}
+
+function interpolateCustomPatternGain(
+  points: AntennaPatternPoint[],
+  azimuthOffsetDeg: number,
+  elevationOffsetDeg: number,
+  fallbackGainDbi: number
+): number {
+  if (!points.length) {
+    return fallbackGainDbi;
+  }
+  const nearest = points
+    .map((point) => {
+      const dAz = Math.abs(normalizedAngleDifferenceDeg(azimuthOffsetDeg, point.azimuthDeg));
+      const dEl = Math.abs(elevationOffsetDeg - point.elevationDeg);
+      const distance = Math.sqrt(dAz * dAz + dEl * dEl);
+      return { point, distance };
+    })
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 4);
+  if (!nearest.length) {
+    return fallbackGainDbi;
+  }
+  if (nearest[0].distance < 1e-6) {
+    return nearest[0].point.gainDbi;
+  }
+  const weighted = nearest.reduce(
+    (acc, entry) => {
+      const weight = 1 / Math.max(entry.distance * entry.distance, 1e-6);
+      return {
+        totalWeight: acc.totalWeight + weight,
+        weightedGain: acc.weightedGain + (entry.point.gainDbi * weight)
+      };
+    },
+    { totalWeight: 0, weightedGain: 0 }
+  );
+  return weighted.totalWeight > 0 ? weighted.weightedGain / weighted.totalWeight : fallbackGainDbi;
+}
+
+async function parseAntennaPatternCsv(file: File): Promise<AntennaPatternPoint[]> {
+  const raw = await file.text();
+  const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
+  if (!lines.length) {
+    throw new Error('CSV file is empty.');
+  }
+  const headerColumns = splitSimpleCsvLine(lines[0]).map((value) => value.trim().toLowerCase());
+  const azIndex = headerColumns.indexOf('azimuth_deg');
+  const elIndex = headerColumns.indexOf('elevation_deg');
+  const gainIndex = headerColumns.indexOf('gain_dbi');
+  if (azIndex < 0 || elIndex < 0 || gainIndex < 0) {
+    throw new Error('CSV header must include azimuth_deg,elevation_deg,gain_dbi.');
+  }
+
+  const points: AntennaPatternPoint[] = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const columns = splitSimpleCsvLine(lines[i]);
+    const azimuthDeg = Number.parseFloat(columns[azIndex] ?? '');
+    const elevationDeg = Number.parseFloat(columns[elIndex] ?? '');
+    const gainDbi = Number.parseFloat(columns[gainIndex] ?? '');
+    if (!Number.isFinite(azimuthDeg) || !Number.isFinite(elevationDeg) || !Number.isFinite(gainDbi)) {
+      throw new Error(`Invalid numeric value on CSV line ${i + 1}.`);
+    }
+    points.push({ azimuthDeg, elevationDeg, gainDbi });
+  }
+  if (points.length < 2) {
+    throw new Error('CSV requires at least 2 data rows.');
+  }
+  return points;
+}
+
+function splitSimpleCsvLine(line: string): string[] {
+  const values: string[] = [];
+  let value = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        value += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === ',' && !inQuotes) {
+      values.push(value);
+      value = '';
+    } else {
+      value += ch;
+    }
+  }
+  values.push(value);
+  return values.map((entry) => entry.trim());
 }
 
 function verticalMonopoleGroundPlaneAttenuationDb(angleDeg: number, exponent: number): number {
@@ -3383,7 +3557,8 @@ function extractAntennaPatternSection(pattern: AntennaPattern, markdown: string)
     'Vertical Dipole': ['vertical dipole'],
     'Vertical Monopole': ['vertical monopole'],
     'Horizontal Dipole': ['horizontal dipole'],
-    Horn: ['rectangular horn', 'horn']
+    Horn: ['rectangular horn', 'horn'],
+    'Custom CSV': ['custom csv']
   };
 
   const topHeadingIndexes: number[] = [];
@@ -3435,6 +3610,9 @@ function antennaPatternDisplayName(pattern: AntennaPattern): string {
   if (pattern === 'Horn') {
     return 'Rectangular Horn';
   }
+  if (pattern === 'Custom CSV') {
+    return 'Custom CSV';
+  }
   return pattern;
 }
 
@@ -3449,12 +3627,17 @@ function defaultPeakGainDbiForPattern(pattern: AntennaPattern): number {
       return 0;
     case 'Horn':
       return 10;
+    case 'Custom CSV':
+      return 0;
     default:
       return 0;
   }
 }
 
 function normalizeAntennaPatternParameters(pattern: AntennaPattern, raw?: Record<string, number>): Record<string, number> {
+  if (pattern === 'Custom CSV') {
+    return {};
+  }
   const defaults = antennaPatternParameterDefaults[pattern];
   const entries = Object.entries(defaults).map(([key, defaultValue]) => {
     const candidate = raw?.[key];
