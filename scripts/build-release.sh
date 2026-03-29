@@ -15,23 +15,31 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 ARTIFACT_NAME="rf-ranger-v${VERSION}"
-WORK_DIR="build/${ARTIFACT_NAME}"
-ZIP_PATH="build/${ARTIFACT_NAME}.zip"
+VERSION_TAG="${VERSION//./_}"
+HTML_PATH="build/RF_Ranger_v${VERSION_TAG}_single_file.html"
 
 rm -rf build
-mkdir -p "$WORK_DIR"
+mkdir -p build
 
 npm ci
 npm run build
 
-cp -r dist/* "$WORK_DIR/"
-cp VERSION "$WORK_DIR/VERSION"
-cp docs/LEGAL.md "$WORK_DIR/LEGAL.md"
-cp docs/Manual.md "$WORK_DIR/Manual.md"
+python3 - "$PWD" "$HTML_PATH" <<'PY'
+import base64
+import mimetypes
+import pathlib
+import sys
 
-(
-  cd build
-  zip -r "${ARTIFACT_NAME}.zip" "${ARTIFACT_NAME}" >/dev/null
-)
+root = pathlib.Path(sys.argv[1])
+output = pathlib.Path(sys.argv[2])
+html = (root / "dist" / "index.html").read_text(encoding="utf-8")
+logo = root / "RF_Ranger.png"
+mime_type, _ = mimetypes.guess_type(logo.name)
+mime_type = mime_type or "application/octet-stream"
+encoded = base64.b64encode(logo.read_bytes()).decode("ascii")
+data_url = f"data:{mime_type};base64,{encoded}"
+html = html.replace('/RF_Ranger.png', data_url)
+output.write_text(html, encoding="utf-8")
+PY
 
-echo "Built release artifact: ${ZIP_PATH}"
+echo "Built release artifact: ${HTML_PATH}"
